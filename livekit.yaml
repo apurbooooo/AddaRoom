@@ -1,23 +1,23 @@
 # LiveKit Open Source Server Configuration for AddaRoom
 port: 7880
 bind_addresses:
-  - ""
+    - ""
 
 rtc:
-  tcp_port: 7881
-  port_range_start: 50000
-  port_range_end: 50050
-  use_external_ip: false
+    tcp_port: 7881
+    port_range_start: 50000
+    port_range_end: 50050
+    use_external_ip: false
 
 turn:
-  enabled: true
-  domain: ""
-  tls_port: 5349
-  udp_port: 3478
+    enabled: true
+    domain: ""
+    tls_port: 5349
+    udp_port: 3478
 
 keys:
-  devkey: secret
+    devkey: secret
 
 logging:
-  level: info
-  pion_level: warn
+    level: info
+    pion_level: warn

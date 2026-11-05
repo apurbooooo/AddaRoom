@@ -7,8 +7,8 @@ describe("AddaRoom Security, Crypto & API Validations", () => {
   it("generates unpredictable url-safe room codes", () => {
     const code1 = generateRoomCode();
     const code2 = generateRoomCode();
-    expect(code1).toMatch(/^[23456789abcdefghjkmnpqrstuvwxyz]{3}-[23456789abcdefghjkmnpqrstuvwxyz]{4}$/);
-    expect(code2).toMatch(/^[23456789abcdefghjkmnpqrstuvwxyz]{3}-[23456789abcdefghjkmnpqrstuvwxyz]{4}$/);
+    expect(code1).toMatch(/^[23456789abcdefghjkmnpqrstuvwxyz]{5}-[23456789abcdefghjkmnpqrstuvwxyz]{5}$/);
+    expect(code2).toMatch(/^[23456789abcdefghjkmnpqrstuvwxyz]{5}-[23456789abcdefghjkmnpqrstuvwxyz]{5}$/);
     expect(code1).not.toBe(code2);
   });
 
@@ -131,3 +131,4 @@ describe("Complete Room Lifecycle End-to-End Simulation", () => {
     expect(finalRoom?.status).toBe("ended");
   });
 });
+

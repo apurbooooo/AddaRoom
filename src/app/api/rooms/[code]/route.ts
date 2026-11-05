@@ -12,6 +12,9 @@ export async function GET(
     if (!room) {
       return NextResponse.json({ error: "Room not found" }, { status: 404 });
     }
+    if (room.status === "ended" || room.expiresAt.getTime() <= Date.now()) {
+      return NextResponse.json({ error: "ROOM_ENDED", message: "This room has ended or expired." }, { status: 410 });
+    }
 
     const participants = await roomStore.getActiveParticipants(room.id);
     const host = participants.find((p) => p.id === room.hostParticipantId);
@@ -44,3 +47,4 @@ export async function GET(
     );
   }
 }
+

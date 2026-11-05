@@ -45,3 +45,10 @@ export const roomSessions = pgTable("room_sessions", {
 }, (table) => [
   index("sessions_participant_idx").on(table.participantId),
 ]);
+
+export const rateLimitBuckets = pgTable("rate_limit_buckets", {
+  key: varchar("key", { length: 64 }).primaryKey(),
+  windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull(),
+  hitCount: integer("hit_count").notNull(),
+}, (table) => [index("rate_limit_window_idx").on(table.windowStartedAt)]);
+

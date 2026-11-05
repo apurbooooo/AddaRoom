@@ -46,3 +46,4 @@ export function FloatingReactions({ reactions }: FloatingReactionsProps) {
     </div>
   );
 }
+

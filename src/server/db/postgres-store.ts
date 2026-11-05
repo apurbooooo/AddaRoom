@@ -1,7 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { eq, and, isNull, sql } from "drizzle-orm";
-import { rooms, participants, roomSessions } from "./schema";
+import { eq, and, isNull, lt, sql } from "drizzle-orm";
+import { rooms, participants, roomSessions, rateLimitBuckets } from "./schema";
 import {
   IRoomStore,
   CreateRoomInput,
@@ -17,10 +17,42 @@ import { generateSecureId, hashSessionSecret, verifySessionSecret } from "@/lib/
 export class PostgresRoomStore implements IRoomStore {
   private db: ReturnType<typeof drizzle>;
   private client: postgres.Sql;
+  private rateLimitOperations = 0;
 
   constructor(databaseUrl: string) {
-    this.client = postgres(databaseUrl, { max: 10, idle_timeout: 20 });
-    this.db = drizzle(this.client, { schema: { rooms, participants, roomSessions } });
+    const isSupabaseOrRemote =
+      databaseUrl.includes("supabase.co") ||
+      databaseUrl.includes("pooler.supabase.com") ||
+      databaseUrl.includes("sslmode=require");
+
+    this.client = postgres(databaseUrl, {
+      max: process.env.VERCEL ? 1 : 10,
+      idle_timeout: 20,
+      prepare: false, // Required for Supabase PgBouncer / transaction pooler on port 6543
+      ssl: isSupabaseOrRemote ? "require" : undefined,
+    });
+    this.db = drizzle(this.client, { schema: { rooms, participants, roomSessions, rateLimitBuckets } });
+  }
+
+  async consumeRateLimit(key: string, limit: number, windowMs: number): Promise<boolean> {
+    const now = new Date();
+    const windowExpiry = new Date(now.getTime() - windowMs);
+    if (++this.rateLimitOperations % 128 === 0) {
+      await this.db.delete(rateLimitBuckets).where(lt(rateLimitBuckets.windowStartedAt, windowExpiry));
+    }
+    const [bucket] = await this.db.insert(rateLimitBuckets).values({
+      key,
+      windowStartedAt: now,
+      hitCount: 1,
+    }).onConflictDoUpdate({
+      target: rateLimitBuckets.key,
+      set: {
+        windowStartedAt: sql`case when ${rateLimitBuckets.windowStartedAt} <= ${windowExpiry} then ${now} else ${rateLimitBuckets.windowStartedAt} end`,
+        hitCount: sql`case when ${rateLimitBuckets.windowStartedAt} <= ${windowExpiry} then 1 else ${rateLimitBuckets.hitCount} + 1 end`,
+      },
+    }).returning({ hitCount: rateLimitBuckets.hitCount });
+
+    return bucket.hitCount <= limit;
   }
 
   async createRoom(input: CreateRoomInput): Promise<{ room: RoomModel; hostParticipant: ParticipantModel }> {
@@ -118,6 +150,9 @@ export class PostgresRoomStore implements IRoomStore {
       if (room.status === "ended") {
         throw new RoomEndedError();
       }
+      if (room.expiresAt.getTime() <= Date.now()) {
+        throw new RoomEndedError("Room has expired");
+      }
       if (room.status === "locked") {
         throw new RoomLockedError();
       }
@@ -163,6 +198,12 @@ export class PostgresRoomStore implements IRoomStore {
     participantId: string,
     sessionSecret: string
   ): Promise<ParticipantModel | null> {
+    const [room] = await this.db.select({ status: rooms.status, expiresAt: rooms.expiresAt })
+      .from(rooms)
+      .where(eq(rooms.id, roomId))
+      .limit(1);
+    if (!room || room.status === "ended" || room.expiresAt.getTime() <= Date.now()) return null;
+
     const [row] = await this.db
       .select()
       .from(participants)
@@ -222,10 +263,21 @@ export class PostgresRoomStore implements IRoomStore {
       const [room] = await tx.select().from(rooms).where(eq(rooms.id, roomId)).for("update");
       if (!room) throw new Error("Room not found");
 
+      const [target] = await tx.select().from(participants).where(and(
+        eq(participants.id, newHostParticipantId),
+        eq(participants.roomId, roomId),
+        isNull(participants.leftAt),
+      )).limit(1);
+      if (!target) throw new Error("Target participant not active in room");
+
       if (room.hostParticipantId) {
-        await tx.update(participants).set({ role: "member" }).where(eq(participants.id, room.hostParticipantId));
+        await tx.update(participants).set({ role: "member" }).where(and(
+          eq(participants.id, room.hostParticipantId), eq(participants.roomId, roomId),
+        ));
       }
-      await tx.update(participants).set({ role: "host" }).where(eq(participants.id, newHostParticipantId));
+      await tx.update(participants).set({ role: "host" }).where(and(
+        eq(participants.id, newHostParticipantId), eq(participants.roomId, roomId), isNull(participants.leftAt),
+      ));
       await tx.update(rooms).set({ hostParticipantId: newHostParticipantId }).where(eq(rooms.id, roomId));
     });
   }
@@ -287,3 +339,4 @@ export class PostgresRoomStore implements IRoomStore {
     };
   }
 }
+

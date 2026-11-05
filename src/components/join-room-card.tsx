@@ -163,3 +163,4 @@ export function JoinRoomCard({ room }: JoinRoomCardProps) {
     </div>
   );
 }
+

@@ -134,10 +134,11 @@ export function RoomControlBar({
           </p>
           {(
             [
-              ["high", "High (1080p 30-60fps)"],
+              ["high", "High (1080p 30fps)"],
+              ["high60", "High (1080p 60fps)"],
               ["balanced", "Balanced (720p 30fps)"],
               ["saver", "Data Saver (480p)"],
-              ["auto", "Auto Adaptive"],
+              ["auto", "Auto (browser default)"],
             ] as const
           ).map(([mode, label]) => (
             <button
@@ -287,3 +288,4 @@ export function RoomControlBar({
     </footer>
   );
 }
+

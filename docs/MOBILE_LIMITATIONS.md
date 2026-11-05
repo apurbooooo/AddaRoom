@@ -30,3 +30,4 @@ Mobile responsiveness is a first-class priority in AddaRoom. However, web browse
 2. **Honest Fallbacks**: If a user on an unsupported mobile browser clicks the screen share button, a non-blocking toast informs them:
    > *"Screen sharing is not supported by your mobile browser. You can still talk, view shared screens, and chat!"*
 3. **Flawless Viewer Experience**: Mobile viewers can watch desktop screen shares in crisp resolution with floating live chat overlay, fullscreen mode, and touch controls.
+

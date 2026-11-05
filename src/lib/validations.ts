@@ -30,3 +30,4 @@ export const moderateRoomSchema = sessionAuthSchema.extend({
   targetParticipantId: z.string().min(1),
   canScreenShare: z.boolean().optional(),
 });
+

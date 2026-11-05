@@ -28,6 +28,7 @@ export interface JoinRoomResult {
 }
 
 export interface IRoomStore {
+  consumeRateLimit(key: string, limit: number, windowMs: number): Promise<boolean>;
   createRoom(input: CreateRoomInput): Promise<{ room: RoomModel; hostParticipant: ParticipantModel }>;
   getRoomByCode(roomCode: string): Promise<RoomModel | null>;
   getRoomById(roomId: string): Promise<RoomModel | null>;
@@ -82,6 +83,24 @@ export class UnauthorizedHostError extends Error {
 export class MemoryRoomStore implements IRoomStore {
   private rooms: Map<string, RoomModel> = new Map();
   private participants: Map<string, ParticipantModel> = new Map();
+  private rateLimitBuckets = new Map<string, { startedAt: number; hits: number }>();
+  private rateLimitOperations = 0;
+
+  async consumeRateLimit(key: string, limit: number, windowMs: number): Promise<boolean> {
+    const now = Date.now();
+    if (++this.rateLimitOperations % 128 === 0) {
+      for (const [bucketKey, value] of this.rateLimitBuckets) {
+        if (now - value.startedAt >= windowMs) this.rateLimitBuckets.delete(bucketKey);
+      }
+    }
+    const bucket = this.rateLimitBuckets.get(key);
+    if (!bucket || now - bucket.startedAt >= windowMs) {
+      this.rateLimitBuckets.set(key, { startedAt: now, hits: 1 });
+      return true;
+    }
+    bucket.hits++;
+    return bucket.hits <= limit;
+  }
 
   async createRoom(input: CreateRoomInput): Promise<{ room: RoomModel; hostParticipant: ParticipantModel }> {
     const roomId = generateSecureId("rm");
@@ -162,13 +181,21 @@ export class MemoryRoomStore implements IRoomStore {
     if (room.status === "ended") {
       throw new RoomEndedError();
     }
+    if (room.expiresAt.getTime() <= Date.now()) {
+      room.status = "ended";
+      throw new RoomEndedError("Room has expired");
+    }
     if (room.status === "locked") {
       throw new RoomLockedError();
     }
 
-    // Atomic capacity check
-    const activeParticipants = await this.getActiveParticipants(roomId);
-    if (activeParticipants.length >= room.capacity) {
+    // Keep the check and insert in one synchronous turn so concurrent joins
+    // cannot both observe the same free slot in this process-local store.
+    let activeCount = 0;
+    for (const participant of this.participants.values()) {
+      if (participant.roomId === roomId && participant.leftAt === null) activeCount++;
+    }
+    if (activeCount >= room.capacity) {
       throw new RoomFullError(`Room has reached maximum capacity of ${room.capacity}`);
     }
 
@@ -202,6 +229,9 @@ export class MemoryRoomStore implements IRoomStore {
     if (!p || p.roomId !== roomId || p.leftAt !== null) {
       return null;
     }
+
+    const room = this.rooms.get(roomId);
+    if (!room || room.status === "ended" || room.expiresAt.getTime() <= Date.now()) return null;
 
     const valid = verifySessionSecret(sessionSecret, p.sessionSecretHash);
     if (!valid) {
@@ -302,3 +332,4 @@ export class MemoryRoomStore implements IRoomStore {
     return { ...p };
   }
 }
+

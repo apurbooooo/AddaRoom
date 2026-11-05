@@ -1,8 +1,24 @@
 import { AccessToken, RoomServiceClient } from "livekit-server-sdk";
+import { getServerLiveKitUrl } from "@/lib/livekit-url";
 
-const LIVEKIT_API_KEY = process.env.LIVEKIT_API_KEY || "devkey";
-const LIVEKIT_API_SECRET = process.env.LIVEKIT_API_SECRET || "secret";
-const LIVEKIT_URL = process.env.LIVEKIT_URL || process.env.NEXT_PUBLIC_LIVEKIT_URL || "http://localhost:7880";
+function getLiveKitConfig() {
+  const production = process.env.NODE_ENV === "production";
+  const apiKey = process.env.LIVEKIT_API_KEY || (production ? "" : "devkey");
+  const apiSecret = process.env.LIVEKIT_API_SECRET || (production ? "" : "secret");
+  const rawUrl = process.env.LIVEKIT_URL || (production ? "" : process.env.NEXT_PUBLIC_LIVEKIT_URL || "http://localhost:7880");
+
+  if (!apiKey || !apiSecret || !rawUrl ||
+      (production && (apiKey === "devkey" || apiSecret === "secret"))) {
+    throw new Error("LIVEKIT_API_KEY, LIVEKIT_API_SECRET, and LIVEKIT_URL must be configured in production");
+  }
+
+  const serverUrl = getServerLiveKitUrl();
+  return { apiKey, apiSecret, serverUrl };
+}
+
+export function assertLiveKitConfigured(): void {
+  getLiveKitConfig();
+}
 
 export async function createLiveKitToken(params: {
   roomCode: string;
@@ -12,14 +28,15 @@ export async function createLiveKitToken(params: {
   avatar?: string;
   canPublish?: boolean;
 }): Promise<string> {
-  const at = new AccessToken(LIVEKIT_API_KEY, LIVEKIT_API_SECRET, {
+  const { apiKey, apiSecret } = getLiveKitConfig();
+  const at = new AccessToken(apiKey, apiSecret, {
     identity: params.participantId,
     name: params.participantName,
     metadata: JSON.stringify({
       avatar: params.avatar || "👋",
       isHost: params.isHost,
     }),
-    ttl: "4h", // 4 hours short-lived token
+    ttl: "10m", // Limit stale-token rejoin exposure on self-hosted LiveKit
   });
 
   at.addGrant({
@@ -35,7 +52,8 @@ export async function createLiveKitToken(params: {
 }
 
 export function getRoomServiceClient(): RoomServiceClient {
-  return new RoomServiceClient(LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET);
+  const { apiKey, apiSecret, serverUrl } = getLiveKitConfig();
+  return new RoomServiceClient(serverUrl, apiKey, apiSecret);
 }
 
 export async function closeLiveKitRoom(roomCode: string): Promise<void> {
@@ -64,3 +82,4 @@ export async function muteLiveKitParticipant(roomCode: string, participantId: st
     console.warn(`[LiveKit] Note: muteLiveKitParticipant for "${participantId}" warning/error:`, err);
   }
 }
+

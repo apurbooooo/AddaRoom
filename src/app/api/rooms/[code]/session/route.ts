@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { roomStore } from "@/server/db";
 import { sessionAuthSchema } from "@/lib/validations";
 import { createLiveKitToken } from "@/server/livekit";
+import { getClientLiveKitUrl } from "@/lib/livekit-url";
 
 export async function POST(
   req: Request,
@@ -21,8 +22,8 @@ export async function POST(
       return NextResponse.json({ error: "Room not found" }, { status: 404 });
     }
 
-    if (room.status === "ended") {
-      return NextResponse.json({ error: "ROOM_ENDED", message: "This room has ended." }, { status: 410 });
+    if (room.status === "ended" || room.expiresAt.getTime() <= Date.now()) {
+      return NextResponse.json({ error: "ROOM_ENDED", message: "This room has ended or expired." }, { status: 410 });
     }
 
     const { participantId, sessionSecret } = parsed.data;
@@ -41,7 +42,7 @@ export async function POST(
       canPublish: true,
     });
 
-    const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || "ws://localhost:7880";
+    const livekitUrl = getClientLiveKitUrl();
 
     return NextResponse.json({
       room: {
@@ -68,3 +69,4 @@ export async function POST(
     return NextResponse.json({ error: "Failed to resume session" }, { status: 500 });
   }
 }
+

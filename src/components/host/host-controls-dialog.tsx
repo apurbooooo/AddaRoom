@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Lock, Unlock, ShieldAlert, UserMinus, Crown, Edit3, X, Check } from "lucide-react";
+import { Lock, Unlock, ShieldAlert, UserMinus, Crown, Edit3, X, Check, Activity, Clock } from "lucide-react";
 import { PublicParticipant } from "@/types";
 
 interface HostControlsDialogProps {
@@ -12,6 +12,7 @@ interface HostControlsDialogProps {
   isLocked: boolean;
   participants: PublicParticipant[];
   currentParticipantId: string;
+  sessionDurationSeconds?: number;
   onUpdateLock: (locked: boolean) => Promise<void>;
   onUpdateTitle: (title: string) => Promise<void>;
   onKickParticipant: (targetParticipantId: string) => Promise<void>;
@@ -27,6 +28,7 @@ export function HostControlsDialog({
   isLocked,
   participants,
   currentParticipantId,
+  sessionDurationSeconds = 0,
   onUpdateLock,
   onUpdateTitle,
   onKickParticipant,
@@ -175,6 +177,50 @@ export function HostControlsDialog({
           </button>
         </div>
 
+        {/* Free Cloud Tier Quota Monitor */}
+        <div className="mb-5 p-3.5 rounded-xl bg-slate-950 border border-slate-800">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5">
+              <Activity className="w-3.5 h-3.5 text-indigo-400" />
+              <span className="text-xs font-semibold text-slate-300">Free Cloud Quota Monitor</span>
+            </div>
+            <span
+              className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
+                sessionDurationSeconds >= 5400
+                  ? "bg-amber-500/20 text-amber-300 border border-amber-500/30"
+                  : "bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+              }`}
+            >
+              {sessionDurationSeconds >= 5400 ? "Approaching Advisory" : "Normal Usage"}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 text-xs mb-2">
+            <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+              <div className="flex items-center gap-1 text-slate-400 mb-0.5 text-[11px]">
+                <Clock className="w-3 h-3 text-slate-400" />
+                <span>Call Duration</span>
+              </div>
+              <span className="font-mono font-bold text-white">
+                {Math.floor(sessionDurationSeconds / 60)}m {sessionDurationSeconds % 60 < 10 ? "0" : ""}
+                {sessionDurationSeconds % 60}s
+              </span>
+            </div>
+
+            <div className="p-2 rounded-lg bg-slate-900 border border-slate-800">
+              <span className="block text-slate-400 text-[11px] mb-0.5">Est. Session Consumption</span>
+              <span className="font-mono font-bold text-indigo-300">
+                {((sessionDurationSeconds / 3600) * (participants.length > 0 ? participants.length : 1)).toFixed(2)}{" "}
+                <span className="text-[10px] text-slate-400">part-hrs</span>
+              </span>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-slate-400 leading-tight">
+            LiveKit Cloud Build free tier provides 100 participant-hours &amp; 50GB egress/month. No billing is enabled.
+          </p>
+        </div>
+
         {/* Participant Moderation */}
         <div className="mb-6">
           <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
@@ -260,3 +306,4 @@ export function HostControlsDialog({
     </div>
   );
 }
+

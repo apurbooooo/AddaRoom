@@ -40,3 +40,4 @@ export async function POST(
     return NextResponse.json({ error: "Failed to update room title" }, { status: 500 });
   }
 }
+

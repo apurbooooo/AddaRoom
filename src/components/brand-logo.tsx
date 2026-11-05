@@ -45,3 +45,4 @@ export function BrandLogo({ size = "md", withTagline = false }: BrandLogoProps) 
     </Link>
   );
 }
+

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { MemoryRoomStore, RoomFullError, RoomLockedError, RoomEndedError } from "../room-store";
 
 describe("Room Lifecycle & Capacity Enforcement", () => {
@@ -153,4 +153,73 @@ describe("Room Lifecycle & Capacity Enforcement", () => {
     const activeRemaining = await store.getActiveParticipants(room.id);
     expect(activeRemaining.find((p) => p.id === guest.id)).toBeUndefined();
   });
+
+  it("enforces memory-store capacity when joins race", async () => {
+    const { room } = await store.createRoom({
+      roomCode: "race-room",
+      title: "Race Room",
+      capacity: 2,
+      hostName: "Host",
+      sessionSecret: "host-secret",
+    });
+
+    const joins = await Promise.allSettled([1, 2, 3, 4].map((n) => store.joinRoom(room.id, {
+      displayName: `Guest ${n}`,
+      sessionSecret: `guest-secret-${n}`,
+    })));
+    expect(joins.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(await store.getActiveParticipants(room.id)).toHaveLength(2);
+  });
+
+  it("rejects host transfer to a participant from another room", async () => {
+    const { room } = await store.createRoom({
+      roomCode: "source-room",
+      title: "Source",
+      capacity: 4,
+      hostName: "Host",
+      sessionSecret: "source-secret",
+    });
+    const { room: otherRoom, hostParticipant: otherHost } = await store.createRoom({
+      roomCode: "other-room",
+      title: "Other",
+      capacity: 4,
+      hostName: "Other host",
+      sessionSecret: "other-secret",
+    });
+
+    expect(otherRoom.id).not.toBe(room.id);
+    await expect(store.transferHost(room.id, otherHost.id)).rejects.toThrow("Target participant not active in room");
+    expect((await store.getRoomById(room.id))?.hostParticipantId).not.toBe(otherHost.id);
+  });
+
+  it("limits repeated requests in the memory-store fallback", async () => {
+    expect(await store.consumeRateLimit("hashed-client", 2, 60_000)).toBe(true);
+    expect(await store.consumeRateLimit("hashed-client", 2, 60_000)).toBe(true);
+    expect(await store.consumeRateLimit("hashed-client", 2, 60_000)).toBe(false);
+    expect(await store.consumeRateLimit("another-client", 2, 60_000)).toBe(true);
+  });
+
+  it("rejects joins and session resumes after room expiry", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-01-01T00:00:00Z"));
+      const { room, hostParticipant } = await store.createRoom({
+        roomCode: "expiry-test",
+        title: "Expiring room",
+        capacity: 2,
+        hostName: "Host",
+        sessionSecret: "host-secret",
+      });
+      vi.advanceTimersByTime(24 * 60 * 60 * 1000 + 1);
+
+      await expect(store.joinRoom(room.id, {
+        displayName: "Guest",
+        sessionSecret: "guest-secret",
+      })).rejects.toThrow(RoomEndedError);
+      expect(await store.verifyParticipantSession(room.id, hostParticipant.id, "host-secret")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
+

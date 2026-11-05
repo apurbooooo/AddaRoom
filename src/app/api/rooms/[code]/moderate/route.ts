@@ -30,6 +30,14 @@ export async function POST(
       );
     }
 
+    const target = await roomStore.getParticipantById(targetParticipantId);
+    if (!target || target.roomId !== room.id || target.leftAt !== null) {
+      return NextResponse.json({ error: "Target participant is not active in this room" }, { status: 404 });
+    }
+    if (targetParticipantId === host.id) {
+      return NextResponse.json({ error: "You cannot moderate yourself" }, { status: 400 });
+    }
+
     if (action === "kick") {
       await roomStore.kickParticipant(targetParticipantId);
       await kickLiveKitParticipant(room.roomCode, targetParticipantId);
@@ -54,3 +62,4 @@ export async function POST(
     return NextResponse.json({ error: "Moderation action failed" }, { status: 500 });
   }
 }
+

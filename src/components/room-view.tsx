@@ -21,7 +21,7 @@ import { ClientSession, PublicParticipant, ScreenShareQualityMode } from "@/type
 import { getScreenShareOptions } from "@/lib/media-constraints";
 import { clearRoomSession } from "@/lib/session-storage";
 import { soundManager } from "@/lib/sound-effects";
-import { Loader2, AlertTriangle, Users, LogOut } from "lucide-react";
+import { Loader2, AlertTriangle, Users, LogOut, X } from "lucide-react";
 
 interface RoomViewProps {
   roomCode: string;
@@ -65,6 +65,18 @@ export function RoomView({
   // Hand raised status
   const [isHandRaised, setIsHandRaised] = useState(false);
 
+  // Free-tier usage monitoring
+  const [sessionDurationSeconds, setSessionDurationSeconds] = useState(0);
+  const [dismissedUsageWarning, setDismissedUsageWarning] = useState(false);
+
+  useEffect(() => {
+    if (!connected) return;
+    const timer = setInterval(() => {
+      setSessionDurationSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [connected]);
+
   // LiveKit data channel hook
   const {
     messages,
@@ -82,7 +94,8 @@ export function RoomView({
     room ?? undefined,
     session.participantId,
     session.displayName,
-    session.avatar
+    session.avatar,
+    publicParticipants.find((participant) => participant.role === "host")?.id,
   );
 
   // Keep unread count up-to-date
@@ -421,6 +434,25 @@ export function RoomView({
         </div>
       </header>
 
+      {/* Free Tier Usage Advisory Banner (triggers when call reaches 90+ minutes) */}
+      {sessionDurationSeconds >= 5400 && !dismissedUsageWarning && (
+        <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2 flex items-center justify-between text-xs text-amber-200 z-30 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
+            <span>
+              <strong>Free-Tier Usage Advisory:</strong> This room has been active for {Math.floor(sessionDurationSeconds / 60)} minutes (~{((sessionDurationSeconds / 3600) * (remoteParticipants.length + 1)).toFixed(1)} participant-hours). Free cloud accounts include ~100 participant-hours/month.
+            </span>
+          </div>
+          <button
+            onClick={() => setDismissedUsageWarning(true)}
+            className="p-1 text-amber-300 hover:text-white rounded hover:bg-amber-500/20"
+            title="Dismiss notice"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* Main Center Video / Media Stage */}
       <main className="flex-1 flex overflow-hidden relative">
         <ParticipantGrid
@@ -491,6 +523,7 @@ export function RoomView({
         isLocked={isLocked}
         participants={publicParticipants}
         currentParticipantId={session.participantId}
+        sessionDurationSeconds={sessionDurationSeconds}
         onUpdateLock={handleUpdateLock}
         onUpdateTitle={handleUpdateTitle}
         onKickParticipant={handleKickParticipant}
@@ -500,3 +533,4 @@ export function RoomView({
     </div>
   );
 }
+

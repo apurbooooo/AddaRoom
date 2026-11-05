@@ -22,6 +22,15 @@ export function getScreenShareOptions(mode: ScreenShareQualityMode): ScreenShare
           frameRate: 30,
         },
       };
+    case "high60":
+      return {
+        audio,
+        resolution: {
+          width: 1920,
+          height: 1080,
+          frameRate: 60,
+        },
+      };
     case "balanced":
       return {
         audio,
@@ -42,13 +51,8 @@ export function getScreenShareOptions(mode: ScreenShareQualityMode): ScreenShare
       };
     case "auto":
     default:
-      return {
-        audio,
-        resolution: {
-          width: 1920,
-          height: 1080,
-          frameRate: 30,
-        },
-      };
+      // Leave capture selection to the browser and the user's display picker.
+      return { audio };
   }
 }
+

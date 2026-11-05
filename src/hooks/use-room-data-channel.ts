@@ -20,7 +20,8 @@ export function useRoomDataChannel(
   room: Room | undefined,
   currentParticipantId: string,
   currentParticipantName: string,
-  currentAvatar: string
+  currentAvatar: string,
+  authorizedHostId?: string,
 ) {
   const [messages, setMessages] = useState<ChatMessagePacket[]>([]);
   const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map());
@@ -98,6 +99,10 @@ export function useRoomDataChannel(
             break;
           }
           case "host_command": {
+            // Data-channel payloads are user-controlled. Accept moderation
+            // notifications only when the sender identity matches the host
+            // reported by the server-backed room roster.
+            if (!authorizedHostId || participant?.identity !== authorizedHostId) break;
             if (data.action === "kick" && data.targetParticipantId === currentParticipantId) {
               setKicked(true);
             }
@@ -119,7 +124,7 @@ export function useRoomDataChannel(
       typingTimeouts.current.forEach((t) => clearTimeout(t));
       typingTimeouts.current.clear();
     };
-  }, [room, currentParticipantId]);
+  }, [room, currentParticipantId, authorizedHostId]);
 
   // Publish generic data packet via LiveKit
   const publishPacket = useCallback(
@@ -244,3 +249,4 @@ export function useRoomDataChannel(
     sendHostBroadcast,
   };
 }
+

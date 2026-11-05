@@ -39,3 +39,4 @@ export async function POST(
     return NextResponse.json({ error: "Failed to end room" }, { status: 500 });
   }
 }
+

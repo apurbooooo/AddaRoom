@@ -29,17 +29,21 @@ services:
     volumes:
       - ./livekit.yaml:/etc/livekit.yaml:ro
     ports:
-      - "7880:7880"         # HTTP / WebSocket signaling
+      - "127.0.0.1:7880:7880" # HTTP / WebSocket signaling; use Caddy in production
       - "7881:7881"         # WebRTC TCP fallback
+      - "3478:3478/udp"     # TURN relay
+      - "5349:5349/tcp"     # TURN over TLS (configure certificate/domain for production)
       - "50000-50050:50000-50050/udp" # WebRTC UDP media traffic
     environment:
-      - LIVEKIT_KEYS=${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-secret}
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-secret}"
 
   # 3. AddaRoom Next.js Application
   app:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_LIVEKIT_URL: ${NEXT_PUBLIC_LIVEKIT_URL:-ws://localhost:7880}
     container_name: addaroom-app
     restart: unless-stopped
     depends_on:
@@ -48,7 +52,7 @@ services:
       livekit:
         condition: service_started
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-addaroom}
@@ -56,6 +60,8 @@ services:
       - NEXT_PUBLIC_LIVEKIT_URL=${NEXT_PUBLIC_LIVEKIT_URL:-ws://localhost:7880}
       - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
       - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-secret}
+      - RATE_LIMIT_SECRET=${RATE_LIMIT_SECRET:-local-development-rate-limit-key}
+    command: ["sh", "-c", "node --experimental-strip-types src/server/db/migrate.ts && node server.js"]
 
   # 4. Caddy Web Server (Optional - for Production Automated HTTPS)
   caddy:
@@ -82,3 +88,4 @@ volumes:
   postgres_data:
   caddy_data:
   caddy_config:
+

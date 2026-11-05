@@ -159,3 +159,4 @@ export function InviteModal({ isOpen, onClose, roomCode, roomTitle }: InviteModa
     </div>
   );
 }
+

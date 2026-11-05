@@ -2,10 +2,19 @@ import { NextResponse } from "next/server";
 import { roomStore } from "@/server/db";
 import { createRoomSchema } from "@/lib/validations";
 import { generateRoomCode, generateSessionSecret } from "@/lib/crypto";
-import { createLiveKitToken } from "@/server/livekit";
+import { assertLiveKitConfigured, createLiveKitToken } from "@/server/livekit";
+import { checkEndpointRateLimit } from "@/server/rate-limit";
+import { getClientLiveKitUrl } from "@/lib/livekit-url";
 
 export async function POST(req: Request) {
   try {
+    assertLiveKitConfigured();
+    if (!(await checkEndpointRateLimit(req, "create-room"))) {
+      return NextResponse.json({ error: "RATE_LIMITED", message: "Too many room creation requests. Try again later." }, {
+        status: 429,
+        headers: { "Retry-After": "900" },
+      });
+    }
     const body = await req.json();
     const parsed = createRoomSchema.safeParse(body);
 
@@ -38,7 +47,7 @@ export async function POST(req: Request) {
       canPublish: true,
     });
 
-    const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || "ws://localhost:7880";
+    const livekitUrl = getClientLiveKitUrl();
 
     return NextResponse.json({
       room: {
@@ -68,3 +77,4 @@ export async function POST(req: Request) {
     );
   }
 }
+

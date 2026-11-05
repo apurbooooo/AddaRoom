@@ -254,3 +254,4 @@ export function ChatPanel({
     </div>
   );
 }
+

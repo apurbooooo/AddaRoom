@@ -14,17 +14,19 @@
 - **No login, no password, no email**: Enter your name and pick an avatar emoji.
 - **Intimate group sizes**: Strict server-enforced capacities (2, 3, 4, or 6 people).
 - **Free-First & 100% Open Source**: Built with permissive open-source tools. No mandatory paid cloud subscriptions, no tracking, and no hidden credit cards.
+- **Zero-Cost Remote Production**: Production runs on remote free-tier cloud services (Vercel + Supabase + LiveKit Cloud). Your personal PC is strictly for local development and testing.
 
 ---
 
 ## ✨ Features
 
-- 🎙️ **Crystal-Clear Voice & Video**: Powered by LiveKit Open Source SFU with echo cancellation, noise suppression, active speaker detection, and device switching.
+- 🎙️ **Crystal-Clear Voice & Video**: Powered by LiveKit SFU with echo cancellation, noise suppression, active speaker detection, and device switching.
 - 🖥️ **High-Performance Screen Sharing**: Target 1080p @ 30–60 FPS with adaptive streaming and shared system/tab audio.
 - 💬 **Live Screen Chat Overlay**: Chat normally in the side drawer, or float live semi-transparent messages directly over shared video with customizable position, opacity, and fade-out timer.
 - ⚡ **Realtime Social Reactions**: Send floating emoji reactions (❤️, 😂, 👏, 😮, 👍, 🔥) and raise your hand.
 - 📊 **Real Network Quality Health**: Inspect actual WebRTC SFU stats: RTT, packet loss, jitter, bitrate, actual incoming resolution, and FPS.
 - 👑 **Server-Authorized Host Controls**: Change room title, lock/unlock entry, mute participants, transfer host role, and end the room for everyone.
+- ⏱️ **Free Cloud Quota Monitor**: Live session tracking in host controls with non-intrusive warnings when calls approach free-tier bounds (e.g. 90+ minutes).
 - 📱 **Mobile-First Responsive Layout**: Optimized touch controls, mobile drawer for chat, and honest runtime detection for mobile browser screen sharing limitations.
 - 🔐 **Ephemeral Privacy**: Chat messages and reactions are exchanged over WebRTC data channels and are never permanently stored in databases.
 
@@ -32,14 +34,37 @@
 
 ## 🏗️ Architecture
 
-- **Frontend**: Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, Lucide Icons.
-- **Realtime Media**: LiveKit Open Source Server (Apache 2.0 SFU) & LiveKit Web SDK.
-- **Database**: PostgreSQL with Drizzle ORM (with in-memory fallback for rapid testing).
-- **Deployment**: Docker Compose with Caddy reverse proxy for automated Let's Encrypt HTTPS.
+```
+                      ┌──────────────────────────────────────┐
+                      │            Client Browser            │
+                      │        (Mobile / Tablet / PC)        │
+                      └───────┬──────────────────────┬───────┘
+                              │                      │
+             HTTPS API / HTML │                      │ WebRTC Media
+              (Next.js App)   │                      │ (Audio/Video/Screen/Data)
+                              ▼                      ▼
+                     ┌─────────────────┐    ┌──────────────────────┐
+                     │  Vercel Hobby   │    │  LiveKit Cloud Build │
+                     │  (Next.js App)  │    │  (Managed SFU Media) │
+                     └────────┬────────┘    └──────────────────────┘
+                              │
+               SQL Pool (6543)│
+                              ▼
+                     ┌─────────────────┐
+                     │  Supabase Free  │
+                     │  (Postgres DB)  │
+                     └─────────────────┘
+```
+
+- **Frontend & API**: Next.js 15 (App Router), React 19, TypeScript, Tailwind CSS, Lucide Icons hosted on **Vercel Hobby**.
+- **Realtime Media**: **LiveKit Cloud Build** (free developer tier with 50 GB egress & 100 participant-hours/month) & LiveKit Web SDK.
+- **Database**: PostgreSQL with Drizzle ORM hosted on **Supabase Free** (Transaction pooler on port 6543).
 
 ---
 
-## 🚀 Quick Start (Local Development)
+## 💻 Local Development (Personal PC)
+
+Your personal PC is used **only** for coding, testing, and git operations.
 
 ### 1. Clone & Install Dependencies
 ```bash
@@ -57,37 +82,27 @@ cp .env.example .env.local
 ```bash
 pnpm dev
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-> [!NOTE]
-> During rapid local UI testing, AddaRoom automatically uses an in-memory database store if `DATABASE_URL` is omitted. For full media SFU testing, launch the PostgreSQL and LiveKit containers using Docker Compose.
+Open [http://localhost:3000](http://localhost:3000) in your browser. During rapid local UI testing, an in-memory database store is used automatically when `DATABASE_URL` is omitted.
 
 ---
 
-## 🐳 Self-Hosting with Docker Compose (Mode A — Default)
+## 🚀 Remote Production Deployment (Recommended)
 
-To run the complete production stack (Next.js, PostgreSQL, LiveKit SFU, and Caddy):
+Production runs 100% remotely across free-tier managed providers:
 
-```bash
-# 1. Start all services
-docker compose up -d
+1. **Supabase Free**: Run [`supabase/schema.sql`](supabase/schema.sql) in your Supabase SQL Editor.
+2. **LiveKit Cloud Build**: Create a free project at [cloud.livekit.io](https://cloud.livekit.io) and retrieve your keys.
+3. **Vercel Hobby**: Connect your GitHub repository to Vercel and paste environment variables.
 
-# 2. Start with automated HTTPS Caddy profile
-docker compose --profile prod up -d --build
-```
-
-Refer to [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) for full port mappings, firewall configuration, and public IP requirements.
+👉 **Follow the complete step-by-step guide in [docs/PRODUCTION_DEPLOYMENT.md](docs/PRODUCTION_DEPLOYMENT.md).**
 
 ---
 
-## ☁️ Optional Free Cloud Deployment (Mode B)
+## ☁️ Future Remote VM Migration (Optional)
 
-AddaRoom can also run on free tiers:
-- **Web App**: Vercel Hobby
-- **Database**: Supabase Free / Neon PostgreSQL
-- **Media SFU**: LiveKit Cloud Build (free developer tier)
+If your group ever outgrows managed free tiers, you can migrate to a dedicated **Remote Cloud VM** (e.g. Oracle Cloud Always Free 4 OCPU / 24GB ARM instance or remote VPS) using Docker Compose and Caddy.
 
-See [docs/VERCEL_FREE_DEPLOYMENT.md](docs/VERCEL_FREE_DEPLOYMENT.md) for step-by-step setup and honest quota explanations.
+👉 **See [docs/SELF_HOSTING.md](docs/SELF_HOSTING.md) for remote VM instructions.** *(Your personal PC is never used as a production server).*
 
 ---
 
@@ -103,9 +118,9 @@ pnpm test
 
 ## 📚 Documentation
 
+- [Production Deployment Guide](docs/PRODUCTION_DEPLOYMENT.md)
 - [System Architecture](docs/ARCHITECTURE.md)
-- [Self-Hosting Guide](docs/SELF_HOSTING.md)
-- [Vercel Free Deployment](docs/VERCEL_FREE_DEPLOYMENT.md)
+- [Future Remote VM Migration](docs/SELF_HOSTING.md)
 - [Mobile Limitations & Fallbacks](docs/MOBILE_LIMITATIONS.md)
 - [Security & Privacy](docs/SECURITY.md)
 - [Testing Guide](docs/TESTING.md)

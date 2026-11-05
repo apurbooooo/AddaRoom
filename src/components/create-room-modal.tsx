@@ -188,3 +188,4 @@ export function CreateRoomModal({ isOpen, onClose }: CreateRoomModalProps) {
     </div>
   );
 }
+

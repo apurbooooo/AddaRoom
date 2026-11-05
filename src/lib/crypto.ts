@@ -1,17 +1,21 @@
 import crypto from "crypto";
 
 export function generateRoomCode(): string {
-  // Format: 3 characters - 4 characters (unpredictable, url-safe, no ambiguous characters like 0/O, 1/I/l)
+  // Format: 5 characters - 5 characters (~49.5 bits, no ambiguous 0/O or 1/I/l)
   const charset = "23456789abcdefghjkmnpqrstuvwxyz";
   const getRand = (len: number) => {
     let res = "";
-    const bytes = crypto.randomBytes(len);
-    for (let i = 0; i < len; i++) {
-      res += charset[bytes[i] % charset.length];
+    const limit = 256 - (256 % charset.length);
+    while (res.length < len) {
+      const bytes = crypto.randomBytes(len - res.length);
+      for (const byte of bytes) {
+        if (byte < limit) res += charset[byte % charset.length];
+        if (res.length === len) break;
+      }
     }
     return res;
   };
-  return `${getRand(3)}-${getRand(4)}`;
+  return `${getRand(5)}-${getRand(5)}`;
 }
 
 export function generateSecureId(prefix = ""): string {
@@ -38,3 +42,4 @@ export function verifySessionSecret(secret: string, hashed: string): boolean {
     return false;
   }
 }
+

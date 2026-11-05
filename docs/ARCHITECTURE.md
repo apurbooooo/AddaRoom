@@ -63,3 +63,4 @@ Unlike peer-to-peer (P2P) mesh architectures where each participant sends $N-1$ 
 3. **Database Salt & Hash**: The server stores only the SHA-256 hash of this session secret.
 4. **Server-Side Host Authorization**: Any administrative action (ending room, locking room, kicking participant) requires the host session secret and is authenticated by the server before executing.
 5. **Short-Lived LiveKit Access Tokens**: LiveKit tokens are minted by the Next.js backend with a 4-hour TTL and restricted permissions.
+

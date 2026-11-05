@@ -41,3 +41,4 @@ export async function POST(
     return NextResponse.json({ error: "Failed to update room lock" }, { status: 500 });
   }
 }
+

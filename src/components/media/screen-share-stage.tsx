@@ -32,7 +32,7 @@ export function ScreenShareStage({
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [actualResolution, setActualResolution] = useState<{ width: number; height: number } | null>(null);
-  const [actualFps, setActualFps] = useState<number>(30);
+  const [actualFps, setActualFps] = useState<number | null>(null);
   const [isMuted, setIsMuted] = useState(false);
   const [showOverlaySettings, setShowOverlaySettings] = useState(false);
 
@@ -47,6 +47,8 @@ export function ScreenShareStage({
   // Attach screen share video track
   useEffect(() => {
     let screenTrackPub: TrackPublication | undefined;
+    let previousFrameCount: number | undefined;
+    let previousSampleAt: number | undefined;
 
     const attachTrack = () => {
       screenTrackPub = participant.getTrackPublication(Track.Source.ScreenShare);
@@ -77,16 +79,35 @@ export function ScreenShareStage({
     // Periodically check video dimensions
     const timer = setInterval(() => {
       if (videoRef.current && videoRef.current.videoWidth > 0) {
+        const video = videoRef.current;
         setActualResolution({
-          width: videoRef.current.videoWidth,
-          height: videoRef.current.videoHeight,
+          width: video.videoWidth,
+          height: video.videoHeight,
         });
+        // Report rendered frames observed by this browser, not the requested
+        // capture rate. Some browsers do not expose this API; omit FPS there.
+        if (typeof video.getVideoPlaybackQuality === "function") {
+          const now = performance.now();
+          const frames = video.getVideoPlaybackQuality().totalVideoFrames;
+          if (previousFrameCount !== undefined && previousSampleAt !== undefined) {
+            const elapsedSeconds = (now - previousSampleAt) / 1000;
+            if (elapsedSeconds > 0) setActualFps(Math.round((frames - previousFrameCount) / elapsedSeconds));
+          }
+          previousFrameCount = frames;
+          previousSampleAt = now;
+        }
+      } else {
+        setActualResolution(null);
+        setActualFps(null);
       }
     }, 2000);
 
     return () => {
       participant.off("trackSubscribed", handleTrackSubscribed);
       clearInterval(timer);
+      if (screenTrackPub?.track && videoRef.current) screenTrackPub.track.detach(videoRef.current);
+      const audioPub = participant.getTrackPublication(Track.Source.ScreenShareAudio);
+      if (audioPub?.track && audioRef.current) audioPub.track.detach(audioRef.current);
     };
   }, [participant, isLocal]);
 
@@ -161,8 +182,12 @@ export function ScreenShareStage({
               <span>
                 {actualResolution.width}x{actualResolution.height}
               </span>
-              <span className="text-slate-400">@</span>
-              <span>{actualFps}fps</span>
+              {actualFps !== null && (
+                <>
+                  <span className="text-slate-400">@</span>
+                  <span>{actualFps}fps</span>
+                </>
+              )}
             </div>
           )}
         </div>
@@ -220,3 +245,4 @@ export function ScreenShareStage({
     </div>
   );
 }
+

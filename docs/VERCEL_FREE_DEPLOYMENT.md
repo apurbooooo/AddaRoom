@@ -19,9 +19,11 @@ AddaRoom supports deployment using standard free cloud tiers. This mode is compl
 
 | Provider | Free Quota | Considerations |
 |----------|------------|----------------|
-| **Vercel Hobby** | 100 GB bandwidth, serverless execution limits | Non-commercial hobby use |
-| **Supabase Free** | 500 MB database, 2 projects | Pauses after 7 days of inactivity |
-| **LiveKit Cloud Build** | 50 GB bandwidth, ~100 participant-hours / month | Sufficient for 2-6 friends weekly hangouts |
+| **Vercel Hobby** | Free personal-use plan with usage limits | Non-commercial use only; quotas can change |
+| **Supabase Free** | 500 MB database, 5 GB egress, up to 2 active projects | Projects may pause after a week of low activity |
+| **LiveKit Cloud Build** | 5,000 WebRTC participant-minutes and 50 GB downstream transfer / month | Hard caps shared across free projects; new connections fail when quota is reached |
+
+These quotas were checked against provider documentation on November 6, 2026. Review the official [Vercel Hobby](https://vercel.com/docs/plans/hobby), [Supabase pricing and pausing](https://supabase.com/pricing), and [LiveKit Cloud quotas](https://docs.livekit.io/deploy/admin/quotas-and-limits/) pages before relying on a free deployment.
 
 ---
 
@@ -30,7 +32,7 @@ AddaRoom supports deployment using standard free cloud tiers. This mode is compl
 ### 1. Database Setup (Supabase / Neon)
 1. Create a free project at [supabase.com](https://supabase.com).
 2. Go to **Project Settings > Database > Connection String**.
-3. Select **URI** with **Session Connection Pooling** (`pgbouncer=true` or port `6543`).
+3. In Supabase **Connect**, choose the shared pooler URI for serverless use and set it as `DATABASE_URL`. The app uses one Postgres.js connection per warm Vercel instance and disables prepared statements for transaction pooler compatibility. Run `pnpm db:migrate` from a trusted local environment using the database connection string before the first deployment. Supabase documents a Postgres.js pipelining caveat with transaction pooling; this optional provider path needs a real join and concurrent-join smoke test before production use.
 
 ### 2. LiveKit Cloud Setup
 1. Create a free account at [cloud.livekit.io](https://cloud.livekit.io).
@@ -45,10 +47,14 @@ AddaRoom supports deployment using standard free cloud tiers. This mode is compl
 2. Import the project into Vercel.
 3. Configure the following environment variables in Vercel:
    ```env
-   DATABASE_URL=postgres://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?pgbouncer=true
+   DATABASE_URL=<paste the transaction-pooler URI from Supabase Connect; require SSL>
    LIVEKIT_URL=https://yourproject.livekit.cloud
    NEXT_PUBLIC_LIVEKIT_URL=wss://yourproject.livekit.cloud
    LIVEKIT_API_KEY=your_api_key
    LIVEKIT_API_SECRET=your_api_secret
+   RATE_LIMIT_SECRET=<a unique long random secret>
    ```
 4. Deploy!
+
+If you put another proxy in front of Vercel, Vercel overwrites the standard forwarded IP header unless the Enterprise Trusted Proxy feature is enabled. The app's rate limit then sees Vercel's observed address; do not claim per-user IP throttling through an unsupported proxy chain. See [Vercel request headers](https://vercel.com/docs/headers/request-headers).
+

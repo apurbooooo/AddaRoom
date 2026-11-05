@@ -50,3 +50,4 @@ AddaRoom is committed to a **free-first and open-source strategy**. Our mission 
 - **Strict Capacity Limits**: Respect the 2, 3, 4, and 6 participant limits with atomic database enforcement.
 - **Preserve Documentation & Comments**: Always maintain high quality documentation.
 - **Mobile First**: Verify that all UI changes render cleanly across mobile portrait and landscape viewports.
+

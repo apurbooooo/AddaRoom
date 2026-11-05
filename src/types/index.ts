@@ -120,7 +120,7 @@ export type LiveKitDataPacket =
   | HandRaisePacket
   | HostCommandPacket;
 
-export type ScreenShareQualityMode = "auto" | "high" | "balanced" | "saver";
+export type ScreenShareQualityMode = "auto" | "high" | "high60" | "balanced" | "saver";
 
 export type ConnectionQualityStatus = "excellent" | "good" | "moderate" | "poor" | "reconnecting";
 
@@ -131,3 +131,4 @@ export interface OverlayChatConfig {
   fadeOutSeconds: number; // 3 to 15
   hideOwnMessages: boolean;
 }
+
