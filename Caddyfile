@@ -1,0 +1,24 @@
+{
+  email {$ACME_EMAIL:admin@example.com}
+}
+
+{$DOMAIN_NAME:localhost} {
+  # Reverse proxy LiveKit WebSocket and RTC signal traffic
+  handle /livekit/* {
+    uri strip_prefix /livekit
+    reverse_proxy livekit:7880
+  }
+
+  # Reverse proxy Next.js Application
+  handle {
+    reverse_proxy app:3000
+  }
+
+  # Security headers
+  header {
+    Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "DENY"
+    Referrer-Policy "strict-origin-when-cross-origin"
+  }
+}

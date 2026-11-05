@@ -1,0 +1,97 @@
+import { NextResponse } from "next/server";
+import { roomStore, RoomFullError, RoomLockedError, RoomEndedError } from "@/server/db";
+import { joinRoomSchema } from "@/lib/validations";
+import { generateSessionSecret } from "@/lib/crypto";
+import { createLiveKitToken } from "@/server/livekit";
+
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ code: string }> }
+) {
+  try {
+    const { code } = await params;
+    const body = await req.json();
+
+    const parsed = joinRoomSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Invalid join data", details: parsed.error.flatten() },
+        { status: 400 }
+      );
+    }
+
+    const room = await roomStore.getRoomByCode(code);
+    if (!room) {
+      return NextResponse.json({ error: "Room not found" }, { status: 404 });
+    }
+
+    const { displayName, avatar } = parsed.data;
+    const sessionSecret = generateSessionSecret();
+
+    try {
+      const { participant } = await roomStore.joinRoom(room.id, {
+        displayName,
+        avatar,
+        sessionSecret,
+      });
+
+      const livekitToken = await createLiveKitToken({
+        roomCode: room.roomCode,
+        participantId: participant.id,
+        participantName: participant.displayName,
+        isHost: participant.role === "host",
+        avatar: participant.avatar,
+        canPublish: true,
+      });
+
+      const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || "ws://localhost:7880";
+
+      return NextResponse.json({
+        room: {
+          id: room.id,
+          roomCode: room.roomCode,
+          title: room.title,
+          capacity: room.capacity,
+          status: room.status,
+        },
+        session: {
+          roomId: room.id,
+          roomCode: room.roomCode,
+          participantId: participant.id,
+          sessionSecret: sessionSecret,
+          displayName: participant.displayName,
+          avatar: participant.avatar,
+          role: participant.role,
+        },
+        livekitToken,
+        livekitUrl,
+      });
+    } catch (joinErr: any) {
+      if (joinErr instanceof RoomFullError) {
+        return NextResponse.json(
+          { error: "ROOM_FULL", message: joinErr.message },
+          { status: 409 }
+        );
+      }
+      if (joinErr instanceof RoomLockedError) {
+        return NextResponse.json(
+          { error: "ROOM_LOCKED", message: "This room is currently locked by the host." },
+          { status: 403 }
+        );
+      }
+      if (joinErr instanceof RoomEndedError) {
+        return NextResponse.json(
+          { error: "ROOM_ENDED", message: "This room has already ended." },
+          { status: 410 }
+        );
+      }
+      throw joinErr;
+    }
+  } catch (error: any) {
+    console.error("Error joining room:", error);
+    return NextResponse.json(
+      { error: "Failed to join room" },
+      { status: 500 }
+    );
+  }
+}

@@ -1,0 +1,84 @@
+version: "3.9"
+
+services:
+  # 1. PostgreSQL Database for Room & Anonymous Session Metadata
+  postgres:
+    image: postgres:16-alpine
+    container_name: addaroom-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-addaroom}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-addaroom}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. LiveKit Open Source SFU Media Server
+  livekit:
+    image: livekit/livekit-server:latest
+    container_name: addaroom-livekit
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "7880:7880"         # HTTP / WebSocket signaling
+      - "7881:7881"         # WebRTC TCP fallback
+      - "50000-50050:50000-50050/udp" # WebRTC UDP media traffic
+    environment:
+      - LIVEKIT_KEYS=${LIVEKIT_API_KEY:-devkey}: ${LIVEKIT_API_SECRET:-secret}
+
+  # 3. AddaRoom Next.js Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: addaroom-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      livekit:
+        condition: service_started
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgres://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-addaroom}
+      - LIVEKIT_URL=http://livekit:7880
+      - NEXT_PUBLIC_LIVEKIT_URL=${NEXT_PUBLIC_LIVEKIT_URL:-ws://localhost:7880}
+      - LIVEKIT_API_KEY=${LIVEKIT_API_KEY:-devkey}
+      - LIVEKIT_API_SECRET=${LIVEKIT_API_SECRET:-secret}
+
+  # 4. Caddy Web Server (Optional - for Production Automated HTTPS)
+  caddy:
+    image: caddy:2-alpine
+    container_name: addaroom-caddy
+    restart: unless-stopped
+    depends_on:
+      - app
+      - livekit
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN_NAME=${DOMAIN_NAME:-localhost}
+      - ACME_EMAIL=${ACME_EMAIL:-admin@example.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    profiles:
+      - prod
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:

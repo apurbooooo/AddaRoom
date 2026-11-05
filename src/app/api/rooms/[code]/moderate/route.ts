@@ -1,0 +1,56 @@
+import { NextResponse } from "next/server";
+import { roomStore } from "@/server/db";
+import { moderateRoomSchema } from "@/lib/validations";
+import { kickLiveKitParticipant } from "@/server/livekit";
+
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ code: string }> }
+) {
+  try {
+    const { code } = await params;
+    const body = await req.json();
+
+    const parsed = moderateRoomSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid moderation command" }, { status: 400 });
+    }
+
+    const room = await roomStore.getRoomByCode(code);
+    if (!room) {
+      return NextResponse.json({ error: "Room not found" }, { status: 404 });
+    }
+
+    const { participantId, sessionSecret, action, targetParticipantId, canScreenShare } = parsed.data;
+    const host = await roomStore.verifyParticipantSession(room.id, participantId, sessionSecret);
+    if (!host || host.role !== "host") {
+      return NextResponse.json(
+        { error: "Forbidden: Only the room host can moderate the room" },
+        { status: 403 }
+      );
+    }
+
+    if (action === "kick") {
+      await roomStore.kickParticipant(targetParticipantId);
+      await kickLiveKitParticipant(room.roomCode, targetParticipantId);
+      return NextResponse.json({ success: true, message: "Participant removed" });
+    }
+
+    if (action === "transfer_host") {
+      await roomStore.transferHost(room.id, targetParticipantId);
+      return NextResponse.json({ success: true, message: "Host transferred successfully" });
+    }
+
+    if (action === "toggle_screen_share") {
+      const updated = await roomStore.updateParticipantPermissions(targetParticipantId, {
+        canScreenShare: canScreenShare ?? true,
+      });
+      return NextResponse.json({ success: true, participant: updated });
+    }
+
+    return NextResponse.json({ error: "Unsupported moderation action" }, { status: 400 });
+  } catch (error: any) {
+    console.error("Error performing moderation action:", error);
+    return NextResponse.json({ error: "Moderation action failed" }, { status: 500 });
+  }
+}

@@ -1,0 +1,70 @@
+import { NextResponse } from "next/server";
+import { roomStore } from "@/server/db";
+import { sessionAuthSchema } from "@/lib/validations";
+import { createLiveKitToken } from "@/server/livekit";
+
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ code: string }> }
+) {
+  try {
+    const { code } = await params;
+    const body = await req.json();
+
+    const parsed = sessionAuthSchema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Invalid session credentials" }, { status: 400 });
+    }
+
+    const room = await roomStore.getRoomByCode(code);
+    if (!room) {
+      return NextResponse.json({ error: "Room not found" }, { status: 404 });
+    }
+
+    if (room.status === "ended") {
+      return NextResponse.json({ error: "ROOM_ENDED", message: "This room has ended." }, { status: 410 });
+    }
+
+    const { participantId, sessionSecret } = parsed.data;
+    const participant = await roomStore.verifyParticipantSession(room.id, participantId, sessionSecret);
+
+    if (!participant) {
+      return NextResponse.json({ error: "Invalid or expired session" }, { status: 401 });
+    }
+
+    const livekitToken = await createLiveKitToken({
+      roomCode: room.roomCode,
+      participantId: participant.id,
+      participantName: participant.displayName,
+      isHost: participant.role === "host",
+      avatar: participant.avatar,
+      canPublish: true,
+    });
+
+    const livekitUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL || "ws://localhost:7880";
+
+    return NextResponse.json({
+      room: {
+        id: room.id,
+        roomCode: room.roomCode,
+        title: room.title,
+        capacity: room.capacity,
+        status: room.status,
+      },
+      session: {
+        roomId: room.id,
+        roomCode: room.roomCode,
+        participantId: participant.id,
+        sessionSecret: sessionSecret,
+        displayName: participant.displayName,
+        avatar: participant.avatar,
+        role: participant.role,
+      },
+      livekitToken,
+      livekitUrl,
+    });
+  } catch (error: any) {
+    console.error("Error resuming session:", error);
+    return NextResponse.json({ error: "Failed to resume session" }, { status: 500 });
+  }
+}

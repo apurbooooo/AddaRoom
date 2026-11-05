@@ -1,0 +1,165 @@
+"use client";
+
+import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import { Users, Lock, LogIn, Loader2, AlertCircle } from "lucide-react";
+import { PublicRoomInfo } from "@/types";
+import { saveRoomSession } from "@/lib/session-storage";
+
+interface JoinRoomCardProps {
+  room: PublicRoomInfo;
+}
+
+export function JoinRoomCard({ room }: JoinRoomCardProps) {
+  const router = useRouter();
+  const [displayName, setDisplayName] = useState("");
+  const [avatar, setAvatar] = useState("👋");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const isFull = room.participantCount >= room.capacity;
+  const isLocked = room.status === "locked";
+  const isEnded = room.status === "ended";
+
+  const avatarOptions = ["👋", "😎", "🦊", "⚡", "🎧", "🎮", "☕", "🐱", "✨", "🍕"];
+
+  const handleJoin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!displayName.trim()) {
+      setError("Please enter your display name");
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const res = await fetch(`/api/rooms/${room.roomCode}/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          displayName: displayName.trim(),
+          avatar,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || data.error || "Failed to join room");
+      }
+
+      saveRoomSession(data.session);
+      router.push(`/room/${room.roomCode}`);
+    } catch (err: any) {
+      setError(err.message || "Failed to join room");
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="w-full max-w-md rounded-2xl bg-slate-900 border border-slate-800 p-6 shadow-2xl text-slate-100">
+      {/* Room Overview Banner */}
+      <div className="p-4 rounded-xl bg-slate-950 border border-slate-800/80 mb-5">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-indigo-400">
+          Private Room
+        </span>
+        <h2 className="text-xl font-bold text-white mt-0.5">{room.title}</h2>
+        <div className="flex items-center gap-3 mt-2 text-xs text-slate-400">
+          <span>Host: <strong className="text-slate-200">{room.hostName}</strong></span>
+          <span>•</span>
+          <span className="flex items-center gap-1">
+            <Users className="w-3.5 h-3.5" />
+            <strong className={isFull ? "text-rose-400" : "text-emerald-400"}>
+              {room.participantCount} / {room.capacity}
+            </strong>
+          </span>
+        </div>
+      </div>
+
+      {/* Capacity & Lock Status alerts */}
+      {isFull && (
+        <div className="mb-4 p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span>
+            <strong>Room Full:</strong> This room has reached its maximum capacity of {room.capacity} participants.
+          </span>
+        </div>
+      )}
+
+      {isLocked && !isFull && (
+        <div className="mb-4 p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-xs flex items-center gap-2">
+          <Lock className="w-4 h-4 flex-shrink-0" />
+          <span>
+            <strong>Room Locked:</strong> The host has temporarily locked this room to new entries.
+          </span>
+        </div>
+      )}
+
+      {isEnded && (
+        <div className="mb-4 p-3.5 rounded-xl bg-slate-800 border border-slate-700 text-slate-300 text-xs flex items-center gap-2">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          <span>
+            <strong>Room Ended:</strong> This Adda session has concluded.
+          </span>
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs">
+          {error}
+        </div>
+      )}
+
+      {/* Join Form */}
+      {!isFull && !isLocked && !isEnded && (
+        <form onSubmit={handleJoin} className="space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+              Your Display Name
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                required
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Enter your name to join..."
+                maxLength={30}
+                className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition-colors"
+              />
+              <div className="w-11 h-11 rounded-xl bg-slate-950 border border-slate-800 flex items-center justify-center text-xl">
+                {avatar}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 mt-2 overflow-x-auto pb-1">
+              {avatarOptions.map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => setAvatar(emoji)}
+                  className={`p-1.5 rounded-lg text-lg transition-transform hover:scale-110 ${
+                    avatar === emoji
+                      ? "bg-indigo-600/30 border border-indigo-500"
+                      : "hover:bg-slate-800"
+                  }`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            disabled={loading || !displayName.trim()}
+            className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-sm shadow-lg shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
+            {loading ? "Joining Adda..." : "Join Hangout"}
+          </button>
+        </form>
+      )}
+    </div>
+  );
+}
