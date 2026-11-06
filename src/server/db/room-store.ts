@@ -6,6 +6,7 @@ import {
   ParticipantRole,
 } from "@/types";
 import { generateSecureId, hashSessionSecret, verifySessionSecret } from "@/lib/crypto";
+import { DEFAULT_AVATAR_ID } from "@/lib/avatar-catalog";
 import bcrypt from "bcryptjs";
 
 export interface CreateRoomInput {
@@ -145,7 +146,7 @@ export class MemoryRoomStore implements IRoomStore {
       id: hostId,
       roomId: roomId,
       displayName: input.hostName.trim(),
-      avatar: input.hostAvatar || "👑",
+      avatar: input.hostAvatar || DEFAULT_AVATAR_ID,
       role: "host",
       sessionSecretHash: hashSessionSecret(input.sessionSecret),
       joinedAt: now,
@@ -224,7 +225,7 @@ export class MemoryRoomStore implements IRoomStore {
       id: participantId,
       roomId: roomId,
       displayName: input.displayName.trim(),
-      avatar: input.avatar || "👋",
+      avatar: input.avatar || DEFAULT_AVATAR_ID,
       role: "member",
       sessionSecretHash: hashSessionSecret(input.sessionSecret),
       joinedAt: now,
@@ -370,4 +371,3 @@ export class MemoryRoomStore implements IRoomStore {
     return bcrypt.compare(password, hash);
   }
 }
-

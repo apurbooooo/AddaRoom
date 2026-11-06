@@ -1,5 +1,6 @@
 import { AccessToken, RoomServiceClient, TrackSource, DataPacket_Kind } from "livekit-server-sdk";
 import { getServerLiveKitUrl } from "@/lib/livekit-url";
+import { DEFAULT_AVATAR_ID } from "@/lib/avatar-catalog";
 
 function getLiveKitConfig() {
   const production = process.env.NODE_ENV === "production";
@@ -35,7 +36,7 @@ export async function createLiveKitToken(params: {
     identity: params.participantId,
     name: params.participantName,
     metadata: JSON.stringify({
-      avatar: params.avatar || "👋",
+      avatar: params.avatar || DEFAULT_AVATAR_ID,
       isHost: params.isHost,
     }),
     ttl: "2h", // 2-hour TTL prevents expiry mid-session while still limiting stale-token exposure
@@ -146,4 +147,3 @@ export async function setLiveKitParticipantHostPermissions(
     }
   }
 }
-

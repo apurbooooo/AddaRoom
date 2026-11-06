@@ -55,7 +55,7 @@ export function CreateRoomModal({ isOpen, onClose }: CreateRoomModalProps) {
 
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error || "Failed to create room");
+        throw new Error(data.message || data.error || "Failed to create room");
       }
 
       // Persist session

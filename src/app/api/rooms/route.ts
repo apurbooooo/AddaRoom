@@ -25,7 +25,11 @@ export async function POST(req: Request) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid room creation input", details: parsed.error.flatten() },
+        {
+          error: "VALIDATION_ERROR",
+          message: parsed.error.issues[0]?.message || "Please check the room details and try again.",
+          details: parsed.error.flatten(),
+        },
         { status: 400 }
       );
     }
@@ -82,4 +86,3 @@ export async function POST(req: Request) {
     );
   }
 }
-

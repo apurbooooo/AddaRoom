@@ -15,6 +15,13 @@
       "when": 1793972640202,
       "tag": "0001_mushy_captain_universe",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1794024000000,
+      "tag": "0002_expand_participant_avatar",
+      "breakpoints": true
     }
   ]
 }

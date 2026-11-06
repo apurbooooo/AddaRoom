@@ -23,7 +23,7 @@ export const participants = pgTable("participants", {
   id: varchar("id", { length: 64 }).primaryKey(),
   roomId: varchar("room_id", { length: 64 }).notNull().references(() => rooms.id, { onDelete: "cascade" }),
   displayName: varchar("display_name", { length: 50 }).notNull(),
-  avatar: varchar("avatar", { length: 16 }).notNull().default("👋"),
+  avatar: varchar("avatar", { length: 64 }).notNull().default("👋"),
   role: varchar("role", { length: 24 }).notNull().default("member"), // 'host' | 'member'
   sessionSecretHash: varchar("session_secret_hash", { length: 128 }).notNull(),
   joinedAt: timestamp("joined_at", { withTimezone: true }).notNull().defaultNow(),
@@ -52,4 +52,3 @@ export const rateLimitBuckets = pgTable("rate_limit_buckets", {
   windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull(),
   hitCount: integer("hit_count").notNull(),
 }, (table) => [index("rate_limit_window_idx").on(table.windowStartedAt)]);
-

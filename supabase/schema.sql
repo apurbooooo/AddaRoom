@@ -22,7 +22,7 @@ CREATE TABLE IF NOT EXISTS "participants" (
 	"id" varchar(64) PRIMARY KEY NOT NULL,
 	"room_id" varchar(64) NOT NULL REFERENCES "rooms"("id") ON DELETE CASCADE,
 	"display_name" varchar(50) NOT NULL,
-	"avatar" varchar(16) DEFAULT '👋' NOT NULL,
+	"avatar" varchar(64) DEFAULT '👋' NOT NULL,
 	"role" varchar(24) DEFAULT 'member' NOT NULL,
 	"session_secret_hash" varchar(128) NOT NULL,
 	"joined_at" timestamp with time zone DEFAULT now() NOT NULL,

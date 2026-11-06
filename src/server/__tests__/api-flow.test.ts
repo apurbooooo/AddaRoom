@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { MemoryRoomStore, RoomFullError } from "../db/room-store";
 import { generateRoomCode, hashSessionSecret, verifySessionSecret } from "@/lib/crypto";
 import { createRoomSchema, joinRoomSchema, setRoomPasswordSchema, moderateRoomSchema } from "@/lib/validations";
+import { AVATAR_CATALOG, DEFAULT_AVATAR_ID } from "@/lib/avatar-catalog";
 import bcrypt from "bcryptjs";
 
 describe("AddaRoom Security, Crypto & API Validations", () => {
@@ -23,6 +24,16 @@ describe("AddaRoom Security, Crypto & API Validations", () => {
   });
 
   it("validates room creation inputs strictly against schema", () => {
+    for (const avatar of AVATAR_CATALOG) {
+      const result = createRoomSchema.safeParse({
+        title: "Weekend Adda",
+        capacity: 4,
+        hostName: "Apurbo",
+        avatar: avatar.id,
+      });
+      expect(result.success, `Create schema rejected ${avatar.id}`).toBe(true);
+    }
+
     // Valid input
     const valid = createRoomSchema.safeParse({
       title: "Weekend Adda",
@@ -31,6 +42,19 @@ describe("AddaRoom Security, Crypto & API Validations", () => {
       avatar: "👑",
     });
     expect(valid.success).toBe(true);
+    expect(valid.success && valid.data.avatar).toBe(DEFAULT_AVATAR_ID);
+
+    expect(createRoomSchema.safeParse({
+      title: "Weekend Adda",
+      capacity: 4,
+      hostName: "Apurbo",
+      avatar: "not-a-catalog-avatar",
+    }).success).toBe(false);
+    expect(createRoomSchema.safeParse({
+      title: "Weekend Adda",
+      capacity: 4,
+      hostName: "Apurbo",
+    }).data?.avatar).toBe(DEFAULT_AVATAR_ID);
 
     // Invalid capacity (must be 2, 3, 4, or 6 only)
     const invalidCap = createRoomSchema.safeParse({
@@ -50,17 +74,38 @@ describe("AddaRoom Security, Crypto & API Validations", () => {
   });
 
   it("validates join inputs", () => {
+    for (const avatar of AVATAR_CATALOG) {
+      const result = joinRoomSchema.safeParse({
+        displayName: "Guest Friend",
+        avatar: avatar.id,
+      });
+      expect(result.success, `Join schema rejected ${avatar.id}`).toBe(true);
+    }
+
     const valid = joinRoomSchema.safeParse({
       displayName: "Guest Friend",
       avatar: "👋",
     });
     expect(valid.success).toBe(true);
+    expect(valid.success && valid.data.avatar).toBe(DEFAULT_AVATAR_ID);
+    expect(joinRoomSchema.safeParse({
+      displayName: "Guest Friend",
+      avatar: "not-a-catalog-avatar",
+    }).success).toBe(false);
+    expect(joinRoomSchema.safeParse({
+      displayName: "Guest Friend",
+    }).data?.avatar).toBe(DEFAULT_AVATAR_ID);
 
     const emptyName = joinRoomSchema.safeParse({
       displayName: "   ",
       avatar: "👋",
     });
     expect(emptyName.success).toBe(false);
+
+    expect(joinRoomSchema.safeParse({
+      displayName: "Guest Friend",
+      avatar: "👑",
+    }).data?.avatar).toBe(DEFAULT_AVATAR_ID);
   });
 
   it("resolves LiveKit URLs correctly with protocol normalization", async () => {
@@ -354,4 +399,3 @@ describe("Room Password Feature", () => {
     expect(result).toBeNull();
   });
 });
-

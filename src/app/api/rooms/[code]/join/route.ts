@@ -29,7 +29,11 @@ export async function POST(
     const parsed = joinRoomWithPasswordSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Invalid join data", details: parsed.error.flatten() },
+        {
+          error: "VALIDATION_ERROR",
+          message: parsed.error.issues[0]?.message || "Please check your details and try again.",
+          details: parsed.error.flatten(),
+        },
         { status: 400 }
       );
     }

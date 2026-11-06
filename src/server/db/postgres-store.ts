@@ -13,6 +13,7 @@ import {
 } from "./room-store";
 import { RoomModel, ParticipantModel, RoomCapacity, RoomStatus } from "@/types";
 import { generateSecureId, hashSessionSecret, verifySessionSecret } from "@/lib/crypto";
+import { DEFAULT_AVATAR_ID } from "@/lib/avatar-catalog";
 import bcrypt from "bcryptjs";
 
 export class PostgresRoomStore implements IRoomStore {
@@ -62,7 +63,7 @@ export class PostgresRoomStore implements IRoomStore {
               "id" varchar(64) PRIMARY KEY NOT NULL,
               "room_id" varchar(64) NOT NULL REFERENCES "rooms"("id") ON DELETE CASCADE,
               "display_name" varchar(50) NOT NULL,
-              "avatar" varchar(16) DEFAULT '👋' NOT NULL,
+              "avatar" varchar(64) DEFAULT '👋' NOT NULL,
               "role" varchar(24) DEFAULT 'member' NOT NULL,
               "session_secret_hash" varchar(128) NOT NULL,
               "joined_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -88,6 +89,7 @@ export class PostgresRoomStore implements IRoomStore {
             );
 
             ALTER TABLE "rooms" ADD COLUMN IF NOT EXISTS "room_password_hash" varchar(128);
+            ALTER TABLE "participants" ALTER COLUMN "avatar" TYPE varchar(64);
           `);
         } catch (err: any) {
           console.warn("[PostgresRoomStore] ensureSchema warning:", err?.message || err);
@@ -172,7 +174,7 @@ export class PostgresRoomStore implements IRoomStore {
       id: hostId,
       roomId: roomId,
       displayName: input.hostName.trim(),
-      avatar: input.hostAvatar || "👑",
+      avatar: input.hostAvatar || DEFAULT_AVATAR_ID,
       role: "host",
       sessionSecretHash: hashSessionSecret(input.sessionSecret),
       joinedAt: now,
@@ -299,7 +301,7 @@ export class PostgresRoomStore implements IRoomStore {
           id: participantId,
           roomId: roomId,
           displayName: input.displayName.trim(),
-          avatar: input.avatar || "👋",
+          avatar: input.avatar || DEFAULT_AVATAR_ID,
           role: "member",
           sessionSecretHash: hashSessionSecret(input.sessionSecret),
           joinedAt: now,
@@ -483,4 +485,3 @@ export class PostgresRoomStore implements IRoomStore {
     };
   }
 }
-
