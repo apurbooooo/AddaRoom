@@ -124,21 +124,8 @@ export function ScreenShareStage({
             {/* Video Element */}
             <video ref={videoRef} autoPlay playsInline muted={isLocal} className="w-full h-full object-contain" />
 
-  return (
-    <div
-      ref={containerRef}
-      className={`relative w-full h-full rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-[#2a2a2a] shadow-2xl group ${
-        isFullscreen ? "rounded-none border-none" : ""
-      }`}
-    >
-      {/* Video Element */}
-      <video
-        ref={videoRef}
-        autoPlay
-        playsInline
-        muted={isLocal}
-        className="w-full h-full object-contain"
-      />
+            {/* Audio Element for Screen Audio */}
+            {!isLocal && <audio ref={audioRef} autoPlay playsInline muted={isMuted} />}
 
             {/* Live Screen Chat Overlay mounted over the video */}
             <ScreenChatOverlay messages={messages} currentParticipantId={currentParticipantId} config={overlayConfig} />
@@ -156,36 +143,28 @@ export function ScreenShareStage({
                         )}
                     </div>
 
-      {/* Top Floating Controls Bar */}
-      <div className="absolute top-3 left-3 right-3 flex items-center justify-between z-40 pointer-events-none">
-        <div className="flex items-center gap-2 pointer-events-auto">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-black/80 border border-white/10 backdrop-blur-md text-xs font-semibold text-white shadow-lg">
-            <Monitor className="w-4 h-4 text-brand" />
-            <span>
-              {participant.name || participant.identity}&apos;s Screen
-            </span>
-            {isLocal && (
-              <span className="text-[10px] bg-brand/30 text-brand px-1.5 py-0.5 rounded">
-                Sharing
-              </span>
-            )}
-          </div>
+                    {/* Actual stream resolution and FPS badge */}
+                    {actualResolution && (
+                        <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-950/80 border border-white/10 backdrop-blur-md text-[11px] font-mono text-emerald-400 shadow-lg">
+                            <span>
+                                {actualResolution.width}x{actualResolution.height}
+                            </span>
+                            <span className="text-slate-400">@</span>
+                            <span>{actualFps}fps</span>
+                        </div>
+                    )}
+                </div>
 
-          {/* Actual stream resolution and FPS badge */}
-          {actualResolution && (
-            <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-black/80 border border-white/10 backdrop-blur-md text-[11px] font-mono text-emerald-400 shadow-lg">
-              <span>
-                {actualResolution.width}x{actualResolution.height}
-              </span>
-              {actualFps !== null && (
-                <>
-                  <span className="text-slate-400">@</span>
-                  <span>{actualFps}fps</span>
-                </>
-              )}
-            </div>
-          )}
-        </div>
+                <div className="flex items-center gap-1.5 pointer-events-auto">
+                    {/* Overlay settings button */}
+                    <button
+                        onClick={() => setShowOverlaySettings(true)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-white/10 backdrop-blur-md text-xs font-medium text-slate-200 transition-colors shadow-lg"
+                        title="Configure Live Screen Chat Overlay"
+                    >
+                        <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                        <span className="hidden md:inline">Chat Overlay</span>
+                    </button>
 
                     {/* Screen Audio mute toggle if remote */}
                     {!isLocal && (
