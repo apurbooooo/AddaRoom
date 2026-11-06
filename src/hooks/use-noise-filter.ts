@@ -204,15 +204,6 @@ export function useNoiseFilter(options?: UseNoiseFilterOptions): UseNoiseFilterR
           return false;
         }
 
-        // Ensure target audio track has an audioContext before setting processor (LiveKit requirement)
-        if (!(targetTrack as any).audioContext) {
-          const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
-          if (AudioCtx) {
-            const ctx = new AudioCtx();
-            await targetTrack.setAudioContext(ctx);
-          }
-        }
-
         let processor = processorRef.current;
         if (!processor) {
           processor = KrispNoiseFilter();
