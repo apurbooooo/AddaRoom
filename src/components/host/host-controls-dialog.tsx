@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Lock, Unlock, ShieldAlert, UserMinus, Crown, Edit3, X, Check, Activity, Clock, KeyRound, KeySquare, Loader2, Mic, MicOff, Monitor, MonitorOff } from "lucide-react";
 import { PublicParticipant } from "@/types";
+import { AvatarPortrait } from "@/components/avatar/avatar-portrait";
 
 interface HostControlsDialogProps {
   isOpen: boolean;
@@ -336,7 +337,7 @@ export function HostControlsDialog({
                   className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-black border border-[#2a2a2a] text-xs"
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-base">{p.avatar || "👤"}</span>
+                    <AvatarPortrait avatarId={p.avatar || p.id} size={28} />
                     <span className="font-semibold text-gray-200 truncate">{p.displayName}</span>
                   </div>
 

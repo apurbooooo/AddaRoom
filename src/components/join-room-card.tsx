@@ -6,6 +6,9 @@ import { Users, Lock, LogIn, Loader2, AlertCircle, KeyRound } from "lucide-react
 import { PublicRoomInfo } from "@/types";
 import { saveRoomSession } from "@/lib/session-storage";
 import { PreJoinPreview } from "@/components/pre-join-preview";
+import { AvatarPicker } from "@/components/avatar/avatar-picker";
+import { AvatarPortrait } from "@/components/avatar/avatar-portrait";
+import { DEFAULT_AVATAR_ID, getSavedAvatarId } from "@/lib/avatar-catalog";
 
 interface JoinRoomCardProps {
   room: PublicRoomInfo;
@@ -14,7 +17,7 @@ interface JoinRoomCardProps {
 export function JoinRoomCard({ room }: JoinRoomCardProps) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState("");
-  const [avatar, setAvatar] = useState("👋");
+  const [avatar, setAvatar] = useState<string>(() => getSavedAvatarId() || DEFAULT_AVATAR_ID);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -23,8 +26,6 @@ export function JoinRoomCard({ room }: JoinRoomCardProps) {
   const isFull = room.participantCount >= room.capacity;
   const isLocked = room.status === "locked";
   const isEnded = room.status === "ended";
-
-  const avatarOptions = ["👋", "😎", "🦊", "⚡", "🎧", "🎮", "☕", "🐱", "✨", "🍕"];
 
   const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
@@ -134,7 +135,7 @@ export function JoinRoomCard({ room }: JoinRoomCardProps) {
             <label className="block text-xs font-semibold text-gray-300 mb-1.5">
               Your Display Name
             </label>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2.5">
               <input
                 type="text"
                 required
@@ -144,28 +145,14 @@ export function JoinRoomCard({ room }: JoinRoomCardProps) {
                 maxLength={30}
                 className="flex-1 px-3.5 py-2.5 rounded-xl bg-black border border-[#2a2a2a] text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand transition-colors"
               />
-              <div className="w-11 h-11 rounded-xl bg-black border border-[#2a2a2a] flex items-center justify-center text-xl">
-                {avatar}
+              <div className="flex-shrink-0" title="Selected avatar preview">
+                <AvatarPortrait avatarId={avatar} size={44} className="border border-[#2a2a2a]" />
               </div>
             </div>
-
-            <div className="flex items-center gap-1.5 mt-2 overflow-x-auto pb-1">
-              {avatarOptions.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => setAvatar(emoji)}
-                  className={`p-1.5 rounded-lg text-lg transition-transform hover:scale-110 min-w-[36px] min-h-[36px] flex items-center justify-center ${
-                    avatar === emoji
-                      ? "bg-brand/20 border border-brand"
-                      : "hover:bg-[#1a1a1a]"
-                  }`}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
           </div>
+
+          {/* User-Selectable Avatar Gallery */}
+          <AvatarPicker selectedId={avatar} onSelect={setAvatar} />
 
           {/* Password field — only shown when room has a password set */}
           {room.hasPassword && (

@@ -6,6 +6,9 @@ import { Users, Sparkles, X, Loader2 } from "lucide-react";
 import { RoomCapacity } from "@/types";
 import { saveRoomSession } from "@/lib/session-storage";
 import { PreJoinPreview } from "@/components/pre-join-preview";
+import { AvatarPicker } from "@/components/avatar/avatar-picker";
+import { AvatarPortrait } from "@/components/avatar/avatar-portrait";
+import { DEFAULT_AVATAR_ID, getSavedAvatarId } from "@/lib/avatar-catalog";
 
 interface CreateRoomModalProps {
   isOpen: boolean;
@@ -17,14 +20,12 @@ export function CreateRoomModal({ isOpen, onClose }: CreateRoomModalProps) {
   const [title, setTitle] = useState("Friday Night Adda");
   const [hostName, setHostName] = useState("");
   const [capacity, setCapacity] = useState<RoomCapacity>(6);
-  const [avatar, setAvatar] = useState("👑");
+  const [avatar, setAvatar] = useState<string>(() => getSavedAvatarId() || DEFAULT_AVATAR_ID);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showPreview, setShowPreview] = useState(false);
 
   if (!isOpen) return null;
-
-  const avatarOptions = ["👑", "🚀", "🦊", "⚡", "🎧", "🎮", "☕", "🦄", "🔥", "🐱"];
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,7 +119,7 @@ export function CreateRoomModal({ isOpen, onClose }: CreateRoomModalProps) {
             <label className="block text-xs font-semibold text-gray-300 mb-1.5">
               Your Display Name
             </label>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2.5">
               <input
                 type="text"
                 required
@@ -128,31 +129,14 @@ export function CreateRoomModal({ isOpen, onClose }: CreateRoomModalProps) {
                 maxLength={30}
                 className="flex-1 px-3.5 py-2.5 rounded-xl bg-black border border-[#2a2a2a] text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand transition-colors"
               />
-              <div className="relative group">
-                <div className="w-11 h-11 rounded-xl bg-black border border-[#2a2a2a] flex items-center justify-center text-xl cursor-pointer hover:border-[#3a3a3a]">
-                  {avatar}
-                </div>
+              <div className="flex-shrink-0" title="Selected avatar preview">
+                <AvatarPortrait avatarId={avatar} size={44} className="border border-[#2a2a2a]" />
               </div>
             </div>
-
-            {/* Avatar picker strip */}
-            <div className="flex items-center gap-1.5 mt-2 overflow-x-auto pb-1">
-              {avatarOptions.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => setAvatar(emoji)}
-                  className={`p-1.5 rounded-lg text-lg transition-transform hover:scale-110 min-w-[36px] min-h-[36px] flex items-center justify-center ${
-                    avatar === emoji
-                      ? "bg-brand/20 border border-brand"
-                      : "hover:bg-[#1a1a1a]"
-                  }`}
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
           </div>
+
+          {/* User-Selectable Avatar Gallery */}
+          <AvatarPicker selectedId={avatar} onSelect={setAvatar} />
 
           {/* Capacity Options: Exactly 2, 3, 4, 6 */}
           <div>

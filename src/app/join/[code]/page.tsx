@@ -4,6 +4,7 @@ import React, { useEffect, useState, use } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/brand-logo";
 import { JoinRoomCard } from "@/components/join-room-card";
+import { AnimatedBackground } from "@/components/ui/animated-background";
 import { PublicRoomInfo } from "@/types";
 import { getRoomSession } from "@/lib/session-storage";
 import { Loader2, AlertCircle } from "lucide-react";
@@ -53,7 +54,7 @@ export default function JoinRoomPage({
   }, [code, router]);
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col">
+    <AnimatedBackground variant="rich" className="min-h-screen text-white flex flex-col">
       <header className="border-b border-[#1a1a1a] bg-black/70 backdrop-blur-md px-6 py-4 flex items-center justify-between">
         <BrandLogo size="md" />
       </header>
@@ -82,6 +83,6 @@ export default function JoinRoomPage({
           <JoinRoomCard room={room} />
         ) : null}
       </main>
-    </div>
+    </AnimatedBackground>
   );
 }

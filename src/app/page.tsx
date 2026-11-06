@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/brand-logo";
 import { CreateRoomModal } from "@/components/create-room-modal";
+import { AnimatedBackground } from "@/components/ui/animated-background";
 import {
   Users,
   Video,
@@ -33,7 +34,7 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-x-clip bg-black text-white">
+    <AnimatedBackground variant="rich" className="flex-1 flex flex-col overflow-x-clip text-white">
       {/* Navigation Bar */}
       <header className="border-b border-[#1a1a1a] bg-black/70 backdrop-blur-md sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 min-w-0">
@@ -271,6 +272,6 @@ export default function LandingPage() {
           </div>
         </div>
       )}
-    </div>
+    </AnimatedBackground>
   );
 }

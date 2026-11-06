@@ -5,6 +5,7 @@ import { Mic, MicOff, Crown, Volume2, Wifi } from "lucide-react";
 import { PublicParticipant } from "@/types";
 import { ParticipantNetworkTelemetry } from "@/hooks/use-network-telemetry";
 import { getConnectionStatusColor, NETWORK_RTT_THRESHOLDS_MS } from "@/lib/network-stats";
+import { AvatarPortrait } from "@/components/avatar/avatar-portrait";
 
 interface RoomSidebarLeftProps {
   participants: PublicParticipant[];
@@ -51,14 +52,12 @@ export function RoomSidebarLeft({
                 }`}
               >
                 {/* Avatar with speaking ring */}
-                <div
-                  className={`relative w-8 h-8 rounded-full flex items-center justify-center text-base flex-shrink-0 ${
-                    speaking
-                      ? "ring-2 ring-brand ring-offset-1 ring-offset-[#111111]"
-                      : "ring-1 ring-[#2a2a2a]"
-                  }`}
-                >
-                  {p.avatar}
+                <div className="relative flex-shrink-0">
+                  <AvatarPortrait
+                    avatarId={p.avatar || p.id}
+                    size={32}
+                    isSpeaking={speaking}
+                  />
                   {speaking && (
                     <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-[#111111] rounded-full flex items-center justify-center">
                       <Volume2 className="w-2 h-2 text-brand" />

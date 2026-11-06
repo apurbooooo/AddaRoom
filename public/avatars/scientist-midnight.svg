@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#061828"/>
+      <stop offset="100%" stop-color="#030c16"/>
+    </radialGradient>
+  </defs>
+  <circle cx="60" cy="60" r="60" fill="url(#bg)"/>
+  <!-- Body / lab coat -->
+  <ellipse cx="60" cy="104" rx="36" ry="24" fill="#f0f4ff"/>
+  <path d="M28 104 Q32 80 60 76 Q88 80 92 104Z" fill="#e8eeff"/>
+  <!-- Lab coat lapels -->
+  <path d="M54 80 L60 90 L66 80" stroke="#c0c8e0" stroke-width="1.5" fill="none"/>
+  <!-- Pocket with pen -->
+  <rect x="34" y="90" width="14" height="10" rx="2" fill="#c0c8e0" stroke="#a0a8c0" stroke-width="1"/>
+  <rect x="38" y="86" width="2" height="6" rx="1" fill="#BBFB2B"/>
+  <rect x="41" y="87" width="2" height="5" rx="1" fill="#ff6060"/>
+  <!-- Neck -->
+  <rect x="54" y="74" width="12" height="10" rx="4" fill="#fad5b0"/>
+  <!-- Head -->
+  <ellipse cx="60" cy="62" rx="21" ry="22" fill="#fad5b0"/>
+  <!-- Hair - neat short with side part -->
+  <ellipse cx="60" cy="46" rx="22" ry="12" fill="#3d1a06"/>
+  <path d="M38 56 Q38 46 60 44 Q82 46 82 56" fill="#3d1a06"/>
+  <rect x="38" y="52" width="5" height="10" rx="2" fill="#3d1a06"/>
+  <!-- Part line -->
+  <path d="M46 44 Q50 56 46 62" stroke="#2a1004" stroke-width="1" fill="none" opacity="0.5"/>
+  <!-- Glasses -->
+  <circle cx="51" cy="64" r="7" fill="none" stroke="#4060a0" stroke-width="1.5"/>
+  <circle cx="69" cy="64" r="7" fill="none" stroke="#4060a0" stroke-width="1.5"/>
+  <line x1="58" y1="64" x2="62" y2="64" stroke="#4060a0" stroke-width="1.5"/>
+  <line x1="44" y1="64" x2="38" y2="62" stroke="#4060a0" stroke-width="1.5"/>
+  <line x1="76" y1="64" x2="82" y2="62" stroke="#4060a0" stroke-width="1.5"/>
+  <!-- Glass lens tint -->
+  <circle cx="51" cy="64" r="6.5" fill="#4060a0" opacity="0.08"/>
+  <circle cx="69" cy="64" r="6.5" fill="#4060a0" opacity="0.08"/>
+  <!-- Eyes behind glasses -->
+  <circle cx="51" cy="64" r="3.5" fill="white"/>
+  <circle cx="69" cy="64" r="3.5" fill="white"/>
+  <circle cx="51.5" cy="64" r="2.5" fill="#2a1a60"/>
+  <circle cx="69.5" cy="64" r="2.5" fill="#2a1a60"/>
+  <circle cx="52" cy="63.3" r="0.8" fill="white"/>
+  <circle cx="70" cy="63.3" r="0.8" fill="white"/>
+  <!-- Eyebrows above glasses -->
+  <path d="M44 56 Q51 54 58 56" stroke="#3d1a06" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M62 56 Q69 54 76 56" stroke="#3d1a06" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <!-- Mouth - thoughtful -->
+  <path d="M54 74 Q60 77 66 74" stroke="#c09070" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+</svg>

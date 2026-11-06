@@ -1,16 +1,24 @@
 import React from "react";
 import Link from "next/link";
+import Image from "next/image";
 
 interface BrandLogoProps {
   size?: "sm" | "md" | "lg";
   withTagline?: boolean;
+  symbolOnly?: boolean;
+  className?: string;
 }
 
-export function BrandLogo({ size = "md", withTagline = false }: BrandLogoProps) {
-  const iconSizes = {
-    sm: "w-7 h-7 text-sm",
-    md: "w-9 h-9 text-base",
-    lg: "w-12 h-12 text-xl",
+export function BrandLogo({
+  size = "md",
+  withTagline = false,
+  symbolOnly = false,
+  className = "",
+}: BrandLogoProps) {
+  const iconDimensions = {
+    sm: { width: 28, height: 28, class: "w-7 h-7" },
+    md: { width: 36, height: 36, class: "w-9 h-9" },
+    lg: { width: 48, height: 48, class: "w-12 h-12" },
   };
 
   const textSizes = {
@@ -19,29 +27,47 @@ export function BrandLogo({ size = "md", withTagline = false }: BrandLogoProps) 
     lg: "text-3xl",
   };
 
+  const currentIcon = iconDimensions[size];
+
   return (
-    <Link href="/" className="inline-flex items-center gap-2.5 group select-none">
+    <Link
+      href="/"
+      className={`inline-flex items-center gap-2.5 group select-none transition-transform active:scale-95 ${className}`}
+      aria-label="AddaRoom Home"
+    >
+      {/* Official AddaRoom Logo Symbol */}
       <div
-        className={`relative ${iconSizes[size]} rounded-xl bg-brand flex items-center justify-center font-bold text-black shadow-lg shadow-brand/25 ring-1 ring-brand/30 transition-all duration-300 group-hover:scale-105 group-hover:shadow-brand/40`}
+        className={`relative ${currentIcon.class} rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center shadow-lg shadow-brand/15 transition-all duration-300 group-hover:scale-105 group-hover:shadow-brand/30`}
       >
-        <span className="font-black tracking-tighter">AR</span>
-        <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-white rounded-full ring-2 ring-black animate-pulse" />
+        <Image
+          src="/brand/addaroom-logo.svg"
+          alt="AddaRoom Logo"
+          width={currentIcon.width}
+          height={currentIcon.height}
+          className="w-full h-full object-contain"
+          priority
+          unoptimized
+        />
       </div>
-      <div className="flex flex-col">
-        <div className="flex items-center gap-1.5">
-          <span className={`font-extrabold tracking-tight text-white ${textSizes[size]}`}>
-            Adda<span className="text-brand">Room</span>
-          </span>
-          <span className="text-[10px] font-semibold tracking-wider uppercase px-1.5 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20 hidden sm:inline-block">
-            FOSS
-          </span>
+
+      {/* Wordmark (unless symbolOnly) */}
+      {!symbolOnly && (
+        <div className="flex flex-col min-w-0">
+          <div className="flex items-center gap-1.5">
+            <span className={`font-black tracking-tight text-[#F4F7EF] ${textSizes[size]}`}>
+              Adda<span className="text-brand">Room</span>
+            </span>
+            <span className="text-[10px] font-semibold tracking-wider uppercase px-1.5 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20 hidden sm:inline-block">
+              FOSS
+            </span>
+          </div>
+          {withTagline && (
+            <span className="text-xs text-gray-400 font-medium truncate">
+              Your Circle. Your Room. Your Adda.
+            </span>
+          )}
         </div>
-        {withTagline && (
-          <span className="text-xs text-gray-400 font-medium">
-            Your Circle. Your Room. Your Adda.
-          </span>
-        )}
-      </div>
+      )}
     </Link>
   );
 }

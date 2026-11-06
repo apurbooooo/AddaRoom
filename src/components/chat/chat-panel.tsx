@@ -3,6 +3,7 @@
 import { ChatMessagePacket } from "@/types";
 import { CornerDownRight, MessageSquare, Send, Smile, X } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
+import { AvatarPortrait } from "@/components/avatar/avatar-portrait";
 
 interface ChatPanelProps {
     isOpen: boolean;
@@ -143,9 +144,11 @@ export function ChatPanel({
                                 )}
 
                                 <div className={`flex gap-2 max-w-[85%] ${isMe ? "flex-row-reverse" : "flex-row"}`}>
-                                    <div className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs mt-0.5">
-                                        {msg.avatar || "👤"}
-                                    </div>
+                                    <AvatarPortrait
+                                        avatarId={msg.avatar || msg.senderId}
+                                        size={28}
+                                        className="mt-0.5 border border-white/10"
+                                    />
                                     <div>
                                         <div
                                             className={`flex items-baseline gap-2 mb-1 ${

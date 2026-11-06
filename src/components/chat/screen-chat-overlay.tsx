@@ -2,6 +2,7 @@
 
 import React from "react";
 import { ChatMessagePacket, OverlayChatConfig } from "@/types";
+import { AvatarPortrait } from "@/components/avatar/avatar-portrait";
 
 interface ScreenChatOverlayProps {
   messages: ChatMessagePacket[];
@@ -51,9 +52,11 @@ export function ScreenChatOverlay({
               className="flex items-start gap-2 animate-in slide-in-from-bottom-2 fade-in duration-200"
               style={{ opacity: config.opacity }}
             >
-              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-black/90 border border-white/20 flex items-center justify-center text-xs shadow-md">
-                {msg.avatar || "💬"}
-              </div>
+              <AvatarPortrait
+                avatarId={msg.avatar || msg.senderId}
+                size={28}
+                className="border border-white/20 shadow-md"
+              />
               <div
                 className={`flex flex-col px-3 py-1.5 rounded-2xl backdrop-blur-md shadow-lg border text-xs ${
                   isMe

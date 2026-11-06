@@ -83,3 +83,50 @@ body {
 ::-webkit-scrollbar-thumb:hover {
     background: rgba(187, 251, 43, 0.3);
 }
+
+@keyframes aurora-slow {
+    0%, 100% {
+        transform: translate(0px, 0px) scale(1);
+    }
+    33% {
+        transform: translate(60px, 40px) scale(1.08);
+    }
+    66% {
+        transform: translate(-30px, 70px) scale(0.95);
+    }
+}
+
+@keyframes aurora-reverse {
+    0%, 100% {
+        transform: translate(0px, 0px) scale(1);
+    }
+    33% {
+        transform: translate(-50px, -60px) scale(1.05);
+    }
+    66% {
+        transform: translate(40px, -30px) scale(0.92);
+    }
+}
+
+@keyframes pulse-slow {
+    0%, 100% {
+        opacity: 0.6;
+        transform: translate(-50%, 0) scale(1);
+    }
+    50% {
+        opacity: 0.9;
+        transform: translate(-50%, 0) scale(1.08);
+    }
+}
+
+.animate-aurora-slow {
+    animation: aurora-slow 32s ease-in-out infinite;
+}
+
+.animate-aurora-reverse {
+    animation: aurora-reverse 40s ease-in-out infinite;
+}
+
+.animate-pulse-slow {
+    animation: pulse-slow 16s ease-in-out infinite;
+}

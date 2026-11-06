@@ -11,7 +11,10 @@ export const metadata: Metadata = {
     title: "AddaRoom",
   },
   icons: {
-    icon: "/icons/icon-192.png",
+    icon: [
+      { url: "/brand/addaroom-logo.svg", type: "image/svg+xml" },
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+    ],
     apple: "/icons/icon-192.png",
   },
 };

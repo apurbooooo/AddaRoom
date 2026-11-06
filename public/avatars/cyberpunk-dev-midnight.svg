@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#120a24"/>
+      <stop offset="100%" stop-color="#0a0612"/>
+    </radialGradient>
+  </defs>
+  <circle cx="60" cy="60" r="60" fill="url(#bg)"/>
+  <!-- Body / jacket -->
+  <ellipse cx="60" cy="104" rx="34" ry="24" fill="#1a0a30"/>
+  <!-- Jacket details -->
+  <path d="M44 92 L60 100 L76 92 L76 115 Q60 120 44 115Z" fill="#2a1050"/>
+  <line x1="60" y1="100" x2="60" y2="120" stroke="#BBFB2B" stroke-width="1.5" opacity="0.6"/>
+  <!-- Collar/neon trim -->
+  <path d="M44 92 L60 100 L76 92" stroke="#BBFB2B" stroke-width="1.5" fill="none" opacity="0.9"/>
+  <!-- Neck -->
+  <rect x="54" y="80" width="12" height="10" rx="4" fill="#c8a87c"/>
+  <!-- Head -->
+  <ellipse cx="60" cy="68" rx="20" ry="22" fill="#c8a87c"/>
+  <!-- Hair — spiky cyberpunk -->
+  <path d="M40 58 L44 44 L48 55 L52 38 L55 52 L60 36 L65 52 L68 38 L72 55 L76 44 L80 58 Q80 50 60 46 Q40 50 40 58Z" fill="#8b00ff"/>
+  <!-- Cyber eye augment - left -->
+  <ellipse cx="52" cy="69" rx="5" ry="4" fill="#120820"/>
+  <ellipse cx="52" cy="69" rx="4" ry="3" fill="#0d0518"/>
+  <ellipse cx="52" cy="69" rx="2.5" ry="2" fill="#ff00ff" opacity="0.9"/>
+  <circle cx="52" cy="69" r="1" fill="white" opacity="0.7"/>
+  <!-- Normal eye - right -->
+  <ellipse cx="68" cy="69" rx="4.5" ry="4" fill="white"/>
+  <circle cx="69" cy="69" r="2.5" fill="#2d0a4e"/>
+  <circle cx="69.8" cy="68" r="0.8" fill="white"/>
+  <!-- Cyber line under left eye -->
+  <path d="M46 72 Q50 74 56 72" stroke="#ff00ff" stroke-width="0.8" fill="none" opacity="0.7"/>
+  <!-- Mouth -->
+  <path d="M54 78 Q60 82 66 78" stroke="#b08060" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <!-- Ear implants -->
+  <circle cx="40" cy="68" r="4" fill="#2a1050" stroke="#8b00ff" stroke-width="1"/>
+  <circle cx="40" cy="68" r="2" fill="#ff00ff" opacity="0.6"/>
+  <circle cx="80" cy="68" r="4" fill="#2a1050" stroke="#8b00ff" stroke-width="1"/>
+  <circle cx="80" cy="68" r="2" fill="#ff00ff" opacity="0.6"/>
+  <!-- Neon circuit on face -->
+  <path d="M76 62 Q78 65 80 68" stroke="#BBFB2B" stroke-width="0.8" fill="none" opacity="0.5"/>
+</svg>

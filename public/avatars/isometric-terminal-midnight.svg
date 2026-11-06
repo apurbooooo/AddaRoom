@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#061222"/>
+      <stop offset="100%" stop-color="#030a14"/>
+    </radialGradient>
+  </defs>
+  <circle cx="60" cy="60" r="60" fill="url(#bg)"/>
+  <!-- Terminal desk -->
+  <rect x="20" y="72" width="80" height="48" rx="4" fill="#0d1a2e"/>
+  <!-- Monitor -->
+  <rect x="28" y="30" width="64" height="46" rx="6" fill="#0a1428" stroke="#1a3a60" stroke-width="2"/>
+  <!-- Monitor screen -->
+  <rect x="32" y="34" width="56" height="38" rx="4" fill="#061020"/>
+  <!-- Terminal text lines - green phosphor -->
+  <text x="36" y="46" font-family="monospace" font-size="5" fill="#BBFB2B" opacity="0.9">$ addaroom --connect</text>
+  <text x="36" y="53" font-family="monospace" font-size="5" fill="#BBFB2B" opacity="0.7">Joining room...</text>
+  <text x="36" y="60" font-family="monospace" font-size="5" fill="#00cc66" opacity="0.9">✓ Connected</text>
+  <text x="36" y="67" font-family="monospace" font-size="5" fill="#BBFB2B">$ <rect x="38" y="63" width="4" height="5" fill="#BBFB2B" opacity="0.9"/></text>
+  <!-- Blinking cursor -->
+  <rect x="43" y="63" width="3" height="4.5" fill="#BBFB2B" opacity="0.9"/>
+  <!-- Monitor stand -->
+  <rect x="54" y="76" width="12" height="6" fill="#0d1a2e" stroke="#1a3a60" stroke-width="1"/>
+  <rect x="46" y="80" width="28" height="4" rx="2" fill="#1a3a60"/>
+  <!-- Keyboard -->
+  <rect x="24" y="88" width="72" height="18" rx="4" fill="#0d1a2e" stroke="#1a3a60" stroke-width="1.5"/>
+  <!-- Key rows -->
+  <rect x="28" y="91" width="64" height="4" rx="1" fill="#0a1428"/>
+  <rect x="28" y="97" width="64" height="4" rx="1" fill="#0a1428"/>
+  <!-- Individual keys hints -->
+  <rect x="30" y="92" width="4" height="2" rx="0.5" fill="#1a3a60"/>
+  <rect x="36" y="92" width="4" height="2" rx="0.5" fill="#1a3a60"/>
+  <rect x="42" y="92" width="4" height="2" rx="0.5" fill="#1a3a60"/>
+  <rect x="48" y="92" width="12" height="2" rx="0.5" fill="#BBFB2B" opacity="0.3"/>
+  <!-- Coffee mug -->
+  <rect x="92" y="78" width="16" height="18" rx="3" fill="#1a3a60"/>
+  <path d="M108 84 Q114 84 114 90 Q114 96 108 96" stroke="#1a3a60" stroke-width="2" fill="none"/>
+  <!-- Steam from coffee -->
+  <path d="M97 76 Q99 72 97 68" stroke="#6a9aaa" stroke-width="1" fill="none" opacity="0.5" stroke-linecap="round"/>
+  <path d="M101 76 Q103 71 101 67" stroke="#6a9aaa" stroke-width="1" fill="none" opacity="0.4" stroke-linecap="round"/>
+  <!-- Glow on screen -->
+  <ellipse cx="60" cy="52" rx="28" ry="19" fill="#BBFB2B" opacity="0.03"/>
+</svg>

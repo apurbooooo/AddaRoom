@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#0d1a2e"/>
+      <stop offset="100%" stop-color="#070f1c"/>
+    </radialGradient>
+  </defs>
+  <circle cx="60" cy="60" r="60" fill="url(#bg)"/>
+  <!-- Body / shirt -->
+  <ellipse cx="60" cy="104" rx="34" ry="24" fill="#1a2840"/>
+  <path d="M28 104 Q32 84 60 80 Q88 84 92 104Z" fill="#1e3050"/>
+  <!-- Shirt collar -->
+  <path d="M54 82 L60 90 L66 82" stroke="#2a4a6a" stroke-width="2" fill="none"/>
+  <!-- Tie/detail -->
+  <path d="M60 90 L57 108 Q60 112 63 108 L60 90Z" fill="#BBFB2B" opacity="0.8"/>
+  <!-- Neck -->
+  <rect x="54" y="78" width="12" height="10" rx="4" fill="#d4a882"/>
+  <!-- Head -->
+  <ellipse cx="60" cy="66" rx="21" ry="23" fill="#d4a882"/>
+  <!-- Short hair -->
+  <ellipse cx="60" cy="48" rx="22" ry="12" fill="#1a0a06"/>
+  <rect x="38" y="52" width="6" height="12" rx="2" fill="#1a0a06"/>
+  <rect x="76" y="52" width="6" height="12" rx="2" fill="#1a0a06"/>
+  <!-- Side hair fade -->
+  <path d="M38 52 Q38 64 40 70" stroke="#1a0a06" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <path d="M82 52 Q82 64 80 70" stroke="#1a0a06" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <!-- Ear -->
+  <ellipse cx="39" cy="68" rx="3.5" ry="4.5" fill="#d4a882"/>
+  <ellipse cx="81" cy="68" rx="3.5" ry="4.5" fill="#d4a882"/>
+  <!-- Eyes -->
+  <ellipse cx="52" cy="68" rx="4.5" ry="4.5" fill="white"/>
+  <ellipse cx="68" cy="68" rx="4.5" ry="4.5" fill="white"/>
+  <circle cx="52.5" cy="68" r="3" fill="#1a0a06"/>
+  <circle cx="68.5" cy="68" r="3" fill="#1a0a06"/>
+  <circle cx="53.3" cy="67" r="1" fill="white"/>
+  <circle cx="69.3" cy="67" r="1" fill="white"/>
+  <!-- Eyebrows -->
+  <path d="M47 62 Q52 59.5 57 62" stroke="#1a0a06" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M63 62 Q68 59.5 73 62" stroke="#1a0a06" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <!-- Stubble hint -->
+  <ellipse cx="60" cy="78" rx="8" ry="3" fill="#b0905e" opacity="0.3"/>
+  <!-- Mouth -->
+  <path d="M54 76 Q60 80 66 76" stroke="#b08060" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+</svg>

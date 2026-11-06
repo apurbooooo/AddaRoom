@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#0a1a0a"/>
+      <stop offset="100%" stop-color="#040a04"/>
+    </radialGradient>
+  </defs>
+  <circle cx="60" cy="60" r="60" fill="url(#bg)"/>
+  <!-- Nature/Forest background hints -->
+  <ellipse cx="20" cy="90" rx="14" ry="30" fill="#0d2010" opacity="0.6"/>
+  <ellipse cx="100" cy="88" rx="12" ry="28" fill="#0d2010" opacity="0.5"/>
+  <!-- Body -->
+  <ellipse cx="60" cy="104" rx="34" ry="24" fill="#1a3020"/>
+  <path d="M28 104 Q32 82 60 78 Q88 82 92 104Z" fill="#243c2c"/>
+  <!-- Vest details -->
+  <line x1="60" y1="80" x2="60" y2="120" stroke="#3a5c40" stroke-width="1.5"/>
+  <!-- Neck -->
+  <rect x="54" y="78" width="12" height="10" rx="4" fill="#d4b880"/>
+  <!-- Head -->
+  <ellipse cx="60" cy="66" rx="21" ry="23" fill="#d4b880"/>
+  <!-- Nature cap / wide-brim hat -->
+  <ellipse cx="60" cy="52" rx="30" ry="6" fill="#5c3a18"/>
+  <ellipse cx="60" cy="48" rx="20" ry="10" fill="#6e4820"/>
+  <!-- Hat band -->
+  <ellipse cx="60" cy="53" rx="20" ry="4" fill="#4a2a10"/>
+  <!-- Leaf on hat -->
+  <path d="M72 46 Q78 40 80 46 Q78 50 72 48Z" fill="#4a7a30"/>
+  <line x1="72" y1="48" x2="80" y2="43" stroke="#3a6020" stroke-width="0.8"/>
+  <!-- Ears -->
+  <ellipse cx="39" cy="68" rx="3.5" ry="4" fill="#d4b880"/>
+  <ellipse cx="81" cy="68" rx="3.5" ry="4" fill="#d4b880"/>
+  <!-- Eyes - warm, kind -->
+  <ellipse cx="52" cy="68" rx="4.5" ry="4" fill="white"/>
+  <ellipse cx="68" cy="68" rx="4.5" ry="4" fill="white"/>
+  <circle cx="52.5" cy="68" r="3" fill="#3a2010"/>
+  <circle cx="68.5" cy="68" r="3" fill="#3a2010"/>
+  <!-- Irises -->
+  <circle cx="52.5" cy="68" r="2" fill="#5a7a30"/>
+  <circle cx="68.5" cy="68" r="2" fill="#5a7a30"/>
+  <circle cx="52" cy="68" r="1" fill="#3a2010"/>
+  <circle cx="68" cy="68" r="1" fill="#3a2010"/>
+  <circle cx="52.8" cy="67.2" r="0.6" fill="white"/>
+  <circle cx="68.8" cy="67.2" r="0.6" fill="white"/>
+  <!-- Eyebrows -->
+  <path d="M47 62 Q52 60 57 62" stroke="#5c3a18" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M63 62 Q68 60 73 62" stroke="#5c3a18" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <!-- Freckles -->
+  <circle cx="47" cy="70" r="1" fill="#b09060" opacity="0.5"/>
+  <circle cx="50" cy="73" r="0.8" fill="#b09060" opacity="0.4"/>
+  <circle cx="73" cy="70" r="1" fill="#b09060" opacity="0.5"/>
+  <!-- Warm smile -->
+  <path d="M53 76 Q60 81 67 76" stroke="#b09060" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+</svg>

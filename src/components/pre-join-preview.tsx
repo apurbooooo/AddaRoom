@@ -2,6 +2,8 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { Camera, CameraOff, Mic, MicOff, ChevronDown, AlertCircle, Loader2 } from "lucide-react";
+import { AvatarPortrait } from "@/components/avatar/avatar-portrait";
+import { DEFAULT_AVATAR_ID, getSavedAvatarId } from "@/lib/avatar-catalog";
 
 interface PreJoinPreviewProps {
   displayName: string;
@@ -180,14 +182,15 @@ export function PreJoinPreview({ displayName, roomTitle, onJoin, onCancel }: Pre
             className={`w-full h-full object-cover ${!cameraEnabled || loading ? "hidden" : ""}`}
           />
           {!cameraEnabled && !loading && (
-            <div className="flex flex-col items-center gap-2 text-gray-500">
-              <CameraOff className="w-10 h-10" />
-              <span className="text-sm">Camera off</span>
+            <div className="flex flex-col items-center gap-2.5">
+              <AvatarPortrait avatarId={getSavedAvatarId() || DEFAULT_AVATAR_ID} size={64} className="border border-white/10 shadow-lg" />
+              <span className="text-xs text-gray-400">Camera off</span>
             </div>
           )}
           {/* Name tag overlay */}
-          <div className="absolute bottom-3 left-3 px-2.5 py-1 rounded-lg bg-black/70 text-white text-sm font-semibold">
-            {displayName}
+          <div className="absolute bottom-3 left-3 px-2.5 py-1.5 rounded-lg bg-black/80 backdrop-blur-sm text-white text-sm font-semibold flex items-center gap-2 border border-white/10">
+            <AvatarPortrait avatarId={getSavedAvatarId() || DEFAULT_AVATAR_ID} size={20} />
+            <span>{displayName}</span>
           </div>
         </div>
 

@@ -6,6 +6,7 @@ import { RoomView } from "@/components/room-view";
 import { getRoomSession, clearRoomSession } from "@/lib/session-storage";
 import { ClientSession } from "@/types";
 import { Loader2 } from "lucide-react";
+import { AnimatedBackground } from "@/components/ui/animated-background";
 
 export default function RoomPage({
   params,
@@ -68,12 +69,12 @@ export default function RoomPage({
 
   if (loading || !session || !livekitToken || !livekitUrl) {
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-white">
+      <AnimatedBackground variant="subtle" className="min-h-screen flex flex-col items-center justify-center p-6 text-white">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 text-brand animate-spin" />
           <p className="text-sm font-semibold text-gray-300">Authenticating room session...</p>
         </div>
-      </div>
+      </AnimatedBackground>
     );
   }
 

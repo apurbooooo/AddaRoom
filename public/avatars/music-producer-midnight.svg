@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a0a30"/>
+      <stop offset="100%" stop-color="#100520"/>
+    </radialGradient>
+  </defs>
+  <circle cx="60" cy="60" r="60" fill="url(#bg)"/>
+  <!-- Body -->
+  <ellipse cx="60" cy="104" rx="34" ry="24" fill="#2a1050"/>
+  <path d="M28 104 Q32 82 60 78 Q88 82 92 104Z" fill="#3a1a60"/>
+  <!-- Music note on chest -->
+  <text x="56" y="96" font-size="14" fill="#BBFB2B" opacity="0.8">♪</text>
+  <!-- Neck -->
+  <rect x="54" y="78" width="12" height="10" rx="4" fill="#f0d0a0"/>
+  <!-- Head -->
+  <ellipse cx="60" cy="66" rx="21" ry="23" fill="#f0d0a0"/>
+  <!-- Hair — natural afro -->
+  <ellipse cx="60" cy="52" rx="26" ry="20" fill="#1a0a06"/>
+  <ellipse cx="40" cy="62" rx="10" ry="12" fill="#1a0a06"/>
+  <ellipse cx="80" cy="62" rx="10" ry="12" fill="#1a0a06"/>
+  <!-- Headphones -->
+  <path d="M38 65 Q36 52 60 48 Q84 52 82 65" stroke="#6a30c0" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <rect x="34" y="62" width="10" height="12" rx="4" fill="#6a30c0"/>
+  <rect x="76" y="62" width="10" height="12" rx="4" fill="#6a30c0"/>
+  <rect x="36" y="64" width="6" height="8" rx="2" fill="#9050f0"/>
+  <rect x="78" y="64" width="6" height="8" rx="2" fill="#9050f0"/>
+  <!-- Eyes -->
+  <ellipse cx="52" cy="67" rx="4.5" ry="4.5" fill="white"/>
+  <ellipse cx="68" cy="67" rx="4.5" ry="4.5" fill="white"/>
+  <circle cx="52.5" cy="67.5" r="3" fill="#1a0a06"/>
+  <circle cx="68.5" cy="67.5" r="3" fill="#1a0a06"/>
+  <circle cx="53.3" cy="66.5" r="1" fill="white"/>
+  <circle cx="69.3" cy="66.5" r="1" fill="white"/>
+  <!-- Eyebrows -->
+  <path d="M47 62 Q52 59.5 57 62" stroke="#1a0a06" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M63 62 Q68 59.5 73 62" stroke="#1a0a06" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <!-- Nose -->
+  <ellipse cx="60" cy="72" rx="4" ry="2.5" fill="#c8a870" opacity="0.5"/>
+  <!-- Mouth - wide smile -->
+  <path d="M51 76 Q60 83 69 76" stroke="#b09070" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <!-- Earring left -->
+  <circle cx="39" cy="68" r="2.5" fill="#6a30c0" stroke="#9050f0" stroke-width="1"/>
+</svg>

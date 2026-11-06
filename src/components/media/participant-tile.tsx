@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Participant, Track, ConnectionQuality } from "livekit-client";
 import { MicOff, Hand, Monitor, Wifi } from "lucide-react";
 import { mapLiveKitQuality, getConnectionStatusColor, NETWORK_RTT_THRESHOLDS_MS } from "@/lib/network-stats";
+import { AvatarPortrait } from "@/components/avatar/avatar-portrait";
 
 interface ParticipantTileProps {
   participant: Participant;
@@ -159,15 +160,12 @@ export function ParticipantTile({
       {/* Fallback Avatar Placeholder when camera is off */}
       {!isVideoEnabled && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-[#111111] to-black p-4">
-          <div
-            className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-3xl sm:text-4xl shadow-xl transition-transform duration-300 ${
-              isSpeaking
-                ? "bg-brand/30 ring-4 ring-brand scale-105"
-                : "bg-[#1a1a1a] ring-2 ring-[#2a2a2a]"
-            }`}
-          >
-            <span>{avatar}</span>
-          </div>
+          <AvatarPortrait
+            avatarId={avatar || participant.identity}
+            size={72}
+            isSpeaking={isSpeaking}
+            className="shadow-2xl transition-transform duration-300"
+          />
         </div>
       )}
 

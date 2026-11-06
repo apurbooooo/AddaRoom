@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1a2535"/>
+      <stop offset="100%" stop-color="#0d1520"/>
+    </radialGradient>
+  </defs>
+  <circle cx="60" cy="60" r="60" fill="url(#bg)"/>
+  <!-- Body / hoodie -->
+  <ellipse cx="60" cy="100" rx="34" ry="28" fill="#1e3a5f"/>
+  <ellipse cx="60" cy="96" rx="26" ry="22" fill="#243c5e"/>
+  <!-- Hoodie logo -->
+  <path d="M54 92 Q60 88 66 92 Q60 96 54 92Z" fill="#BBFB2B" opacity="0.8"/>
+  <!-- Neck -->
+  <rect x="54" y="80" width="12" height="10" rx="4" fill="#f5c5a3"/>
+  <!-- Head -->
+  <ellipse cx="60" cy="68" rx="20" ry="22" fill="#f5c5a3"/>
+  <!-- Hair -->
+  <ellipse cx="60" cy="52" rx="21" ry="12" fill="#2d1b6e"/>
+  <rect x="39" y="52" width="6" height="12" rx="3" fill="#2d1b6e"/>
+  <rect x="75" y="52" width="6" height="12" rx="3" fill="#2d1b6e"/>
+  <!-- Eyes -->
+  <ellipse cx="52" cy="68" rx="4" ry="4.5" fill="white"/>
+  <ellipse cx="68" cy="68" rx="4" ry="4.5" fill="white"/>
+  <circle cx="53" cy="68" r="2.5" fill="#2d1b6e"/>
+  <circle cx="69" cy="68" r="2.5" fill="#2d1b6e"/>
+  <circle cx="53.8" cy="67" r="1" fill="white"/>
+  <circle cx="69.8" cy="67" r="1" fill="white"/>
+  <!-- Eyebrows -->
+  <path d="M48 62 Q52 60 56 62" stroke="#2d1b6e" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M64 62 Q68 60 72 62" stroke="#2d1b6e" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <!-- Smile -->
+  <path d="M54 76 Q60 80 66 76" stroke="#c89a7a" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <!-- Gaming headset -->
+  <path d="M40 65 Q39 52 60 48 Q81 52 80 65" stroke="#BBFB2B" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <rect x="36" y="62" width="8" height="10" rx="3" fill="#BBFB2B"/>
+  <rect x="76" y="62" width="8" height="10" rx="3" fill="#BBFB2B"/>
+  <!-- Mic boom -->
+  <path d="M44 70 Q38 74 36 80" stroke="#BBFB2B" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <circle cx="36" cy="81" r="2" fill="#BBFB2B"/>
+</svg>

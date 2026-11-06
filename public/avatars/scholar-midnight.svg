@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#18140a"/>
+      <stop offset="100%" stop-color="#0e0c06"/>
+    </radialGradient>
+  </defs>
+  <circle cx="60" cy="60" r="60" fill="url(#bg)"/>
+  <!-- Book pages at bottom -->
+  <rect x="30" y="92" width="60" height="30" rx="3" fill="#e8d8b0"/>
+  <line x1="60" y1="92" x2="60" y2="122" stroke="#c8b880" stroke-width="1"/>
+  <!-- Text lines on book -->
+  <line x1="34" y1="98" x2="58" y2="98" stroke="#a09060" stroke-width="1" opacity="0.6"/>
+  <line x1="34" y1="102" x2="56" y2="102" stroke="#a09060" stroke-width="1" opacity="0.4"/>
+  <line x1="62" y1="98" x2="86" y2="98" stroke="#a09060" stroke-width="1" opacity="0.6"/>
+  <line x1="62" y1="102" x2="84" y2="102" stroke="#a09060" stroke-width="1" opacity="0.4"/>
+  <!-- Body -->
+  <ellipse cx="60" cy="104" rx="34" ry="20" fill="#2c1808"/>
+  <path d="M28 104 Q32 82 60 78 Q88 82 92 104Z" fill="#3c2410"/>
+  <!-- Academic robe hint -->
+  <path d="M44 84 Q48 100 44 116" stroke="#1a0a04" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M76 84 Q72 100 76 116" stroke="#1a0a04" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- Neck -->
+  <rect x="54" y="78" width="12" height="10" rx="4" fill="#f0d0a0"/>
+  <!-- Head -->
+  <ellipse cx="60" cy="66" rx="21" ry="23" fill="#f0d0a0"/>
+  <!-- Hair -->
+  <ellipse cx="60" cy="48" rx="22" ry="12" fill="#6e4818"/>
+  <path d="M38 60 Q38 48 60 46 Q82 48 82 60" fill="#6e4818"/>
+  <!-- Reading glasses -->
+  <ellipse cx="51" cy="67" rx="7" ry="5.5" fill="none" stroke="#3a2010" stroke-width="1.5"/>
+  <ellipse cx="69" cy="67" rx="7" ry="5.5" fill="none" stroke="#3a2010" stroke-width="1.5"/>
+  <line x1="58" y1="67" x2="62" y2="67" stroke="#3a2010" stroke-width="1.5"/>
+  <line x1="44" y1="66" x2="38" y2="64" stroke="#3a2010" stroke-width="1.5"/>
+  <line x1="76" y1="66" x2="82" y2="64" stroke="#3a2010" stroke-width="1.5"/>
+  <!-- Eyes behind glasses -->
+  <ellipse cx="51" cy="67" rx="5.5" ry="4" fill="none"/>
+  <circle cx="51" cy="67" r="3" fill="white"/>
+  <circle cx="69" cy="67" r="3" fill="white"/>
+  <circle cx="51.5" cy="67" r="2" fill="#3a2010"/>
+  <circle cx="69.5" cy="67" r="2" fill="#3a2010"/>
+  <circle cx="52" cy="66.5" r="0.7" fill="white"/>
+  <circle cx="70" cy="66.5" r="0.7" fill="white"/>
+  <!-- Eyebrows - expressive -->
+  <path d="M44 61 Q51 58 58 61" stroke="#6e4818" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <path d="M62 61 Q69 58 76 61" stroke="#6e4818" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+  <!-- Knowing smile -->
+  <path d="M54 75 Q60 79 66 75" stroke="#c09060" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+</svg>

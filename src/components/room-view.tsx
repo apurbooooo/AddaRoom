@@ -784,6 +784,12 @@ export function RoomView({
 
   return (
     <div className="relative h-[100dvh] min-h-0 w-full overflow-hidden bg-black text-white flex flex-col select-none">
+      {/* Subtle ambient backdrop */}
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden select-none" aria-hidden="true">
+        <div className="absolute top-0 right-1/4 w-[500px] h-[300px] rounded-full bg-[radial-gradient(ellipse,rgba(187,251,43,0.02)_0%,transparent_70%)] blur-[100px]" />
+        <div className="absolute bottom-0 left-1/4 w-[600px] h-[300px] rounded-full bg-[radial-gradient(ellipse,rgba(16,185,129,0.015)_0%,transparent_70%)] blur-[120px]" />
+      </div>
+
       {/* Top Header Bar */}
       <header className="min-h-14 border-b border-[#2a2a2a] bg-black/90 px-2.5 sm:px-4 flex items-center justify-between gap-2 backdrop-blur-md z-30 flex-shrink-0">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
