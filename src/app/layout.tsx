@@ -4,6 +4,16 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "AddaRoom — Your Circle. Your Room. Your Adda.",
   description: "A private place to watch, talk, share and hang out with your favorite people. Free, open-source, and registration-free.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "AddaRoom",
+  },
+  icons: {
+    icon: "/icons/icon-192.png",
+    apple: "/icons/icon-192.png",
+  },
 };
 
 export const viewport: Viewport = {

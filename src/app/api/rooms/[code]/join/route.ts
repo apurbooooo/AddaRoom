@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { roomStore, RoomFullError, RoomLockedError, RoomEndedError } from "@/server/db";
-import { joinRoomSchema } from "@/lib/validations";
+import { joinRoomWithPasswordSchema } from "@/lib/validations";
 import { generateSessionSecret } from "@/lib/crypto";
 import { assertLiveKitConfigured, createLiveKitToken } from "@/server/livekit";
 import { checkEndpointRateLimit } from "@/server/rate-limit";
@@ -26,7 +26,7 @@ export async function POST(
       return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const parsed = joinRoomSchema.safeParse(body);
+    const parsed = joinRoomWithPasswordSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { error: "Invalid join data", details: parsed.error.flatten() },
@@ -37,6 +37,19 @@ export async function POST(
     const room = await roomStore.getRoomByCode(code);
     if (!room) {
       return NextResponse.json({ error: "Room not found" }, { status: 404 });
+    }
+
+    // Password check — if room has a password, verify before allowing join
+    const passwordOk = await roomStore.verifyRoomPassword(room.id, parsed.data.password);
+    if (!passwordOk) {
+      const hasHash = !!room.roomPasswordHash;
+      return NextResponse.json(
+        {
+          error: hasHash ? "WRONG_PASSWORD" : "PASSWORD_REQUIRED",
+          message: hasHash ? "Incorrect room password." : "This room requires a password to join.",
+        },
+        { status: 403 }
+      );
     }
 
     const { displayName, avatar } = parsed.data;

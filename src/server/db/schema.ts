@@ -7,6 +7,7 @@ export const rooms = pgTable("rooms", {
   capacity: integer("capacity").notNull().default(6),
   status: varchar("status", { length: 24 }).notNull().default("active"), // 'active' | 'locked' | 'ended'
   hostParticipantId: varchar("host_participant_id", { length: 64 }),
+  roomPasswordHash: varchar("room_password_hash", { length: 128 }), // nullable — set when host locks with password
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   settings: jsonb("settings").$type<{

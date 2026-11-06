@@ -31,3 +31,11 @@ export const moderateRoomSchema = sessionAuthSchema.extend({
   canScreenShare: z.boolean().optional(),
 });
 
+export const setRoomPasswordSchema = sessionAuthSchema.extend({
+  password: z.string().max(50).optional(), // undefined / empty string = remove password
+});
+
+export const joinRoomWithPasswordSchema = joinRoomSchema.extend({
+  password: z.string().max(50).optional(),
+});
+

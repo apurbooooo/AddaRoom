@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Lock, Unlock, ShieldAlert, UserMinus, Crown, Edit3, X, Check, Activity, Clock } from "lucide-react";
+import { Lock, Unlock, ShieldAlert, UserMinus, Crown, Edit3, X, Check, Activity, Clock, KeyRound, KeySquare, Loader2 } from "lucide-react";
 import { PublicParticipant } from "@/types";
 
 interface HostControlsDialogProps {
@@ -10,6 +10,7 @@ interface HostControlsDialogProps {
   roomCode: string;
   roomTitle: string;
   isLocked: boolean;
+  hasPassword: boolean;
   participants: PublicParticipant[];
   currentParticipantId: string;
   sessionDurationSeconds?: number;
@@ -18,6 +19,7 @@ interface HostControlsDialogProps {
   onKickParticipant: (targetParticipantId: string) => Promise<void>;
   onTransferHost: (targetParticipantId: string) => Promise<void>;
   onEndRoom: () => Promise<void>;
+  onSetPassword: (password: string | null) => Promise<void>;
 }
 
 export function HostControlsDialog({
@@ -26,6 +28,7 @@ export function HostControlsDialog({
   roomCode,
   roomTitle,
   isLocked,
+  hasPassword,
   participants,
   currentParticipantId,
   sessionDurationSeconds = 0,
@@ -34,11 +37,13 @@ export function HostControlsDialog({
   onKickParticipant,
   onTransferHost,
   onEndRoom,
+  onSetPassword,
 }: HostControlsDialogProps) {
   const [editingTitle, setEditingTitle] = useState(false);
   const [newTitle, setNewTitle] = useState(roomTitle);
   const [loadingAction, setLoadingAction] = useState<string | null>(null);
   const [showEndConfirm, setShowEndConfirm] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
 
   if (!isOpen) return null;
 
@@ -89,6 +94,26 @@ export function HostControlsDialog({
     setLoadingAction("end");
     try {
       await onEndRoom();
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleSetPassword = async () => {
+    if (!newPassword.trim()) return;
+    setLoadingAction("setPassword");
+    try {
+      await onSetPassword(newPassword.trim());
+      setNewPassword("");
+    } finally {
+      setLoadingAction(null);
+    }
+  };
+
+  const handleRemovePassword = async () => {
+    setLoadingAction("removePassword");
+    try {
+      await onSetPassword(null);
     } finally {
       setLoadingAction(null);
     }
@@ -175,6 +200,57 @@ export function HostControlsDialog({
           >
             {isLocked ? "Unlock" : "Lock"}
           </button>
+        </div>
+
+        {/* Room Password */}
+        <div className="mb-5 p-3.5 rounded-xl bg-black border border-[#2a2a2a]">
+          <div className="flex items-center gap-1.5 mb-3">
+            <KeyRound className="w-3.5 h-3.5 text-brand" />
+            <span className="text-xs font-semibold text-gray-300">Room Password</span>
+          </div>
+          <div className="flex items-center gap-2 mb-2">
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              placeholder="Enter new password..."
+              className="flex-1 px-3.5 py-2.5 rounded-xl bg-black border border-[#2a2a2a] text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand transition-colors"
+            />
+            <button
+              onClick={handleSetPassword}
+              disabled={!newPassword.trim() || loadingAction === "setPassword"}
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-brand hover:bg-[#ceff44] text-black text-xs font-bold disabled:opacity-50 transition-colors min-h-[44px]"
+            >
+              {loadingAction === "setPassword" ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <KeySquare className="w-3.5 h-3.5" />
+              )}
+              Set
+            </button>
+            {hasPassword && (
+              <button
+                onClick={handleRemovePassword}
+                disabled={loadingAction === "removePassword"}
+                className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-600/40 text-rose-300 text-xs font-semibold disabled:opacity-50 transition-colors min-h-[44px]"
+              >
+                {loadingAction === "removePassword" ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <X className="w-3.5 h-3.5" />
+                )}
+                Remove
+              </button>
+            )}
+          </div>
+          <p className="text-[11px]">
+            Status:{" "}
+            {hasPassword ? (
+              <span className="text-[#BBFB2B] font-semibold">Password protected</span>
+            ) : (
+              <span className="text-gray-500">No password</span>
+            )}
+          </p>
         </div>
 
         {/* Free Cloud Tier Quota Monitor */}

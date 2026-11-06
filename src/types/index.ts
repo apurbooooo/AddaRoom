@@ -16,6 +16,7 @@ export interface RoomModel {
   capacity: RoomCapacity;
   status: RoomStatus;
   hostParticipantId: string | null;
+  roomPasswordHash: string | null;
   createdAt: Date;
   expiresAt: Date;
   settings: RoomSettings;
@@ -53,6 +54,7 @@ export interface PublicRoomInfo {
   status: RoomStatus;
   hostName: string;
   participantCount: number;
+  hasPassword: boolean;
   participants: PublicParticipant[];
 }
 
@@ -130,5 +132,24 @@ export interface OverlayChatConfig {
   position: "bottom-left" | "bottom-right" | "top-left" | "top-right";
   fadeOutSeconds: number; // 3 to 15
   hideOwnMessages: boolean;
+}
+
+// Watch Party — Media Queue & Playback Sync
+export interface MediaQueueItem {
+  id: string;
+  type: "youtube" | "file" | "url";
+  title: string;
+  src: string;
+  addedBy: string;
+  addedByName: string;
+}
+
+export interface PlaybackSyncPacket {
+  type: "playback_sync";
+  action: "play" | "pause" | "seek" | "next" | "queue_update";
+  currentTime?: number;
+  itemId?: string;
+  queue?: MediaQueueItem[];
+  currentIndex?: number;
 }
 

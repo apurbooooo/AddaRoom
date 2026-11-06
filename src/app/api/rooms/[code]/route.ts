@@ -28,6 +28,7 @@ export async function GET(
         status: room.status,
         hostName: host ? host.displayName : "Host",
         participantCount: participants.length,
+        hasPassword: !!room.roomPasswordHash,
         participants: participants.map((p) => ({
           id: p.id,
           displayName: p.displayName,

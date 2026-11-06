@@ -16,6 +16,10 @@ import {
   VolumeX,
   ChevronUp,
   FlipHorizontal,
+  Ear,
+  EarOff,
+  Maximize2,
+  Minimize2,
 } from "lucide-react";
 import { ScreenShareQualityMode } from "@/types";
 import { soundManager } from "@/lib/sound-effects";
@@ -30,6 +34,8 @@ interface RoomControlBarProps {
   unreadCount: number;
   isChatOpen: boolean;
   qualityMode: ScreenShareQualityMode;
+  isNoiseEnabled: boolean;
+  isFullscreen: boolean;
   onToggleMic: () => void;
   onToggleVideo: () => void;
   onFlipCamera?: () => void;
@@ -38,6 +44,8 @@ interface RoomControlBarProps {
   onSendReaction: (emoji: string) => void;
   onToggleHandRaise: () => void;
   onToggleChat: () => void;
+  onToggleNoise: () => void;
+  onToggleFullscreen: () => void;
   onOpenInvite: () => void;
   onOpenHostControls: () => void;
   onLeaveRoom: () => void;
@@ -58,6 +66,8 @@ export function RoomControlBar({
   unreadCount,
   isChatOpen,
   qualityMode,
+  isNoiseEnabled,
+  isFullscreen,
   onToggleMic,
   onToggleVideo,
   onFlipCamera,
@@ -66,6 +76,8 @@ export function RoomControlBar({
   onSendReaction,
   onToggleHandRaise,
   onToggleChat,
+  onToggleNoise,
+  onToggleFullscreen,
   onOpenInvite,
   onOpenHostControls,
   onLeaveRoom,
@@ -171,8 +183,8 @@ export function RoomControlBar({
       )}
 
       <div className="max-w-4xl mx-auto flex items-center justify-between gap-1 sm:gap-3">
-        {/* Left Side: Room Extras (Invite, Host Controls, Sound) */}
-        <div className="flex items-center gap-1 sm:gap-2">
+        {/* Left Side: Room Extras (Invite, Host Controls, Sound, Noise) */}
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           <button
             onClick={onOpenInvite}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#111111] hover:bg-[#1a1a1a] border border-[#2a2a2a] text-gray-200 text-xs font-semibold transition-colors min-h-[44px]"
@@ -200,14 +212,27 @@ export function RoomControlBar({
           >
             {soundOn ? <Volume2 className="w-4 h-4 text-gray-300" /> : <VolumeX className="w-4 h-4 text-gray-500" />}
           </button>
+
+          {/* Noise Reduction Toggle */}
+          <button
+            onClick={onToggleNoise}
+            className={`p-2 rounded-xl transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center ${
+              isNoiseEnabled
+                ? "text-brand hover:bg-brand/10"
+                : "text-gray-500 hover:text-gray-300 hover:bg-[#1a1a1a]"
+            }`}
+            title={isNoiseEnabled ? "Noise Reduction On" : "Noise Reduction Off"}
+          >
+            {isNoiseEnabled ? <Ear className="w-4 h-4" /> : <EarOff className="w-4 h-4" />}
+          </button>
         </div>
 
-        {/* Center: Primary Media Controls */}
-        <div className="flex items-center gap-1.5 sm:gap-2">
+        {/* Center: Primary Media Controls — horizontally scrollable on small screens */}
+        <div className="flex-1 overflow-x-auto scrollbar-none flex items-center justify-center gap-1.5 sm:gap-2 min-w-0 touch-pan-x">
           {/* Mic */}
           <button
             onClick={onToggleMic}
-            className={`p-3 rounded-2xl transition-all shadow-md min-w-[48px] min-h-[48px] flex items-center justify-center ${
+            className={`p-3 rounded-2xl transition-all shadow-md min-w-[48px] min-h-[48px] flex items-center justify-center flex-shrink-0 ${
               isMicEnabled
                 ? "bg-[#1a1a1a] hover:bg-[#2a2a2a] text-white border border-[#2a2a2a]"
                 : "bg-rose-600 hover:bg-rose-500 text-white"
@@ -218,7 +243,7 @@ export function RoomControlBar({
           </button>
 
           {/* Camera */}
-          <div className="relative flex items-center">
+          <div className="relative flex items-center flex-shrink-0">
             <button
               onClick={onToggleVideo}
               className={`p-3 transition-all shadow-md min-w-[48px] min-h-[48px] flex items-center justify-center ${
@@ -247,7 +272,7 @@ export function RoomControlBar({
           </div>
 
           {/* Screen Share with Quality picker */}
-          <div className="relative flex items-center">
+          <div className="relative flex items-center flex-shrink-0">
             <button
               onClick={handleScreenShareClick}
               className={`p-3 rounded-l-2xl transition-all shadow-md min-w-[48px] min-h-[48px] flex items-center justify-center ${
@@ -275,15 +300,24 @@ export function RoomControlBar({
           {/* Reactions Toggle */}
           <button
             onClick={() => setShowReactions((prev) => !prev)}
-            className="p-3 rounded-2xl bg-[#1a1a1a] hover:bg-[#2a2a2a] text-gray-200 border border-[#2a2a2a] shadow-md transition-colors min-w-[48px] min-h-[48px] flex items-center justify-center"
+            className="p-3 rounded-2xl bg-[#1a1a1a] hover:bg-[#2a2a2a] text-gray-200 border border-[#2a2a2a] shadow-md transition-colors min-w-[48px] min-h-[48px] flex items-center justify-center flex-shrink-0"
             title="Send Reaction"
           >
             <Smile className="w-5 h-5 text-amber-300" />
           </button>
         </div>
 
-        {/* Right Side: Chat & Leave */}
-        <div className="flex items-center gap-1 sm:gap-2">
+        {/* Right Side: Chat, Fullscreen & Leave */}
+        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+          {/* Fullscreen Toggle */}
+          <button
+            onClick={onToggleFullscreen}
+            className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition-colors min-w-[44px] min-h-[44px] hidden sm:flex items-center justify-center"
+            title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
+
           {/* Chat Drawer Toggle */}
           <button
             onClick={onToggleChat}
@@ -302,7 +336,7 @@ export function RoomControlBar({
             )}
           </button>
 
-          {/* Leave Room Button */}
+          {/* Leave Room Button — always visible */}
           <button
             onClick={onLeaveRoom}
             className="p-3 rounded-2xl bg-rose-600/20 hover:bg-rose-600 border border-rose-600/40 text-rose-300 hover:text-white transition-all shadow-md group min-w-[48px] min-h-[48px] flex items-center justify-center"

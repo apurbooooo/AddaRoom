@@ -17,8 +17,11 @@ import { InviteModal } from "@/components/invite-modal";
 import { HostControlsDialog } from "@/components/host/host-controls-dialog";
 import { FloatingReactions } from "@/components/social/floating-reactions";
 import { BrandLogo } from "@/components/brand-logo";
+import { RoomSidebarLeft } from "@/components/room/room-sidebar-left";
 import { useRoomDataChannel } from "@/hooks/use-room-data-channel";
 import { useAudioPlayback } from "@/hooks/use-audio-playback";
+import { useNoiseFilter } from "@/hooks/use-noise-filter";
+import { useFullscreen } from "@/hooks/use-fullscreen";
 import { ClientSession, PublicParticipant, ScreenShareQualityMode } from "@/types";
 import { getScreenShareOptions } from "@/lib/media-constraints";
 import { clearRoomSession } from "@/lib/session-storage";
@@ -78,6 +81,7 @@ export function RoomView({
   // Room metadata
   const [roomTitle, setRoomTitle] = useState(session.roomCode);
   const [isLocked, setIsLocked] = useState(false);
+  const [hasRoomPassword, setHasRoomPassword] = useState(false);
 
   // Modals & Panels
   const [isChatOpen, setIsChatOpen] = useState(false);
@@ -102,6 +106,13 @@ export function RoomView({
 
   // Audio playback hook — handles iOS Safari audio unlock
   const { canPlayAudio, startAudio } = useAudioPlayback(room ?? undefined);
+
+  // Noise filter + fullscreen hooks
+  const { isNoiseEnabled, toggleNoise } = useNoiseFilter();
+  const { isFullscreen, toggleFullscreen } = useFullscreen();
+
+  // Active speakers tracking
+  const [speakingParticipantIds, setSpeakingParticipantIds] = useState<string[]>([]);
 
   // LiveKit data channel hook
   const {
@@ -229,6 +240,11 @@ export function RoomView({
 
         lkRoom.on(RoomEvent.Reconnected, () => {
           setIsReconnecting(false);
+        });
+
+        // Track active speakers for the left sidebar speaking indicators
+        lkRoom.on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
+          setSpeakingParticipantIds(speakers.map((s) => s.identity));
         });
 
         // Sync track states if reconnecting with published tracks
@@ -429,6 +445,22 @@ export function RoomView({
     router.push("/");
   };
 
+  const handleSetPassword = async (password: string | null) => {
+    const res = await fetch(`/api/rooms/${roomCode}/password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        participantId: session.participantId,
+        sessionSecret: session.sessionSecret,
+        password: password ?? undefined,
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      setHasRoomPassword(!!data.hasPassword);
+    }
+  };
+
   const handleLeaveRoom = async () => {
     if (confirm("Leave this room?")) {
       try {
@@ -596,33 +628,61 @@ export function RoomView({
         </div>
       )}
 
-      {/* Main Center Video / Media Stage */}
-      <main className="flex-1 flex overflow-hidden relative">
-        <ParticipantGrid
-          localParticipant={room?.localParticipant}
-          remoteParticipants={remoteParticipants}
-          raisedHands={raisedHands}
-          messages={messages}
-          currentParticipantId={session.participantId}
-          onStopScreenShare={() => handleToggleScreenShare()}
-          qualityMode={qualityMode}
-          onChangeQualityMode={setQualityMode}
+      {/* Three-panel layout: Left sidebar | Center media | Right chat (desktop) */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
+        {/* Left sidebar — participants list, desktop only */}
+        <RoomSidebarLeft
+          participants={publicParticipants}
+          localParticipantId={session.participantId}
+          speakingParticipantIds={speakingParticipantIds}
+          className="hidden lg:flex"
         />
 
-        {/* Floating Social Reactions */}
-        <FloatingReactions reactions={activeReactions} />
+        {/* Center — video grid + floating reactions */}
+        <main className="flex-1 flex overflow-hidden relative min-w-0">
+          <ParticipantGrid
+            localParticipant={room?.localParticipant}
+            remoteParticipants={remoteParticipants}
+            raisedHands={raisedHands}
+            messages={messages}
+            currentParticipantId={session.participantId}
+            onStopScreenShare={() => handleToggleScreenShare()}
+            qualityMode={qualityMode}
+            onChangeQualityMode={setQualityMode}
+          />
 
-        {/* Right Side / Drawer Chat Panel */}
-        <ChatPanel
-          isOpen={isChatOpen}
-          onClose={() => setIsChatOpen(false)}
-          messages={messages}
-          currentParticipantId={session.participantId}
-          onSendMessage={sendMessage}
-          onSendTyping={sendTyping}
-          typingUsers={typingUsers}
-        />
-      </main>
+          {/* Floating Social Reactions */}
+          <FloatingReactions reactions={activeReactions} />
+
+          {/* Mobile chat drawer (overlay) — full width on mobile, hidden on desktop */}
+          <div className={`absolute inset-0 z-20 lg:hidden transition-transform duration-300 ${isChatOpen ? "translate-x-0" : "translate-x-full"}`}>
+            <ChatPanel
+              isOpen={isChatOpen}
+              onClose={() => setIsChatOpen(false)}
+              messages={messages}
+              currentParticipantId={session.participantId}
+              onSendMessage={sendMessage}
+              onSendTyping={sendTyping}
+              typingUsers={typingUsers}
+            />
+          </div>
+        </main>
+
+        {/* Right sidebar — chat panel, desktop only, shown when chat open */}
+        {isChatOpen && (
+          <aside className="hidden lg:flex w-80 flex-shrink-0 flex-col bg-[#111111] border-l border-[#1a1a1a] overflow-hidden">
+            <ChatPanel
+              isOpen={isChatOpen}
+              onClose={() => { setIsChatOpen(false); }}
+              messages={messages}
+              currentParticipantId={session.participantId}
+              onSendMessage={sendMessage}
+              onSendTyping={sendTyping}
+              typingUsers={typingUsers}
+            />
+          </aside>
+        )}
+      </div>
 
       {/* Bottom Media Control Bar */}
       <RoomControlBar
@@ -634,6 +694,8 @@ export function RoomView({
         unreadCount={unreadCount}
         isChatOpen={isChatOpen}
         qualityMode={qualityMode}
+        isNoiseEnabled={isNoiseEnabled}
+        isFullscreen={isFullscreen}
         onToggleMic={handleToggleMic}
         onToggleVideo={handleToggleVideo}
         onFlipCamera={handleFlipCamera}
@@ -645,6 +707,8 @@ export function RoomView({
           setIsChatOpen((prev) => !prev);
           setUnreadCount(0);
         }}
+        onToggleNoise={toggleNoise}
+        onToggleFullscreen={toggleFullscreen}
         onOpenInvite={() => setIsInviteOpen(true)}
         onOpenHostControls={() => setIsHostControlsOpen(true)}
         onLeaveRoom={handleLeaveRoom}
@@ -665,6 +729,7 @@ export function RoomView({
         roomCode={roomCode}
         roomTitle={roomTitle}
         isLocked={isLocked}
+        hasPassword={hasRoomPassword}
         participants={publicParticipants}
         currentParticipantId={session.participantId}
         sessionDurationSeconds={sessionDurationSeconds}
@@ -673,6 +738,7 @@ export function RoomView({
         onKickParticipant={handleKickParticipant}
         onTransferHost={handleTransferHost}
         onEndRoom={handleEndRoom}
+        onSetPassword={handleSetPassword}
       />
     </div>
   );

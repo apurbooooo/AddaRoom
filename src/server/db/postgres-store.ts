@@ -13,6 +13,7 @@ import {
 } from "./room-store";
 import { RoomModel, ParticipantModel, RoomCapacity, RoomStatus } from "@/types";
 import { generateSecureId, hashSessionSecret, verifySessionSecret } from "@/lib/crypto";
+import bcrypt from "bcryptjs";
 
 export class PostgresRoomStore implements IRoomStore {
   private db: ReturnType<typeof drizzle>;
@@ -312,6 +313,26 @@ export class PostgresRoomStore implements IRoomStore {
     return this.mapParticipant(updated);
   }
 
+  async setRoomPassword(roomId: string, passwordHash: string | null): Promise<void> {
+    await this.db
+      .update(rooms)
+      .set({ roomPasswordHash: passwordHash })
+      .where(eq(rooms.id, roomId));
+  }
+
+  async verifyRoomPassword(roomId: string, password: string | undefined): Promise<boolean> {
+    const [row] = await this.db
+      .select({ roomPasswordHash: rooms.roomPasswordHash })
+      .from(rooms)
+      .where(eq(rooms.id, roomId))
+      .limit(1);
+    if (!row) return false;
+    const hash = row.roomPasswordHash;
+    if (!hash) return true; // open room — no password
+    if (!password) return false; // password required but not provided
+    return bcrypt.compare(password, hash);
+  }
+
   private mapRoom(r: typeof rooms.$inferSelect): RoomModel {
     return {
       id: r.id,
@@ -320,6 +341,7 @@ export class PostgresRoomStore implements IRoomStore {
       capacity: r.capacity as RoomCapacity,
       status: r.status as RoomStatus,
       hostParticipantId: r.hostParticipantId,
+      roomPasswordHash: r.roomPasswordHash ?? null,
       createdAt: r.createdAt,
       expiresAt: r.expiresAt,
       settings: r.settings || { allowScreenShare: true, allowChat: true },

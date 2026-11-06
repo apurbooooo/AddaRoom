@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { MemoryRoomStore, RoomFullError } from "../db/room-store";
 import { generateRoomCode, hashSessionSecret, verifySessionSecret } from "@/lib/crypto";
-import { createRoomSchema, joinRoomSchema } from "@/lib/validations";
+import { createRoomSchema, joinRoomSchema, setRoomPasswordSchema } from "@/lib/validations";
+import bcrypt from "bcryptjs";
 
 describe("AddaRoom Security, Crypto & API Validations", () => {
   it("generates unpredictable url-safe room codes", () => {
@@ -187,6 +188,118 @@ describe("Complete Room Lifecycle End-to-End Simulation", () => {
     await store.endRoom(room.id);
     const finalRoom = await store.getRoomById(room.id);
     expect(finalRoom?.status).toBe("ended");
+  });
+});
+
+describe("Room Password Feature", () => {
+  let store: MemoryRoomStore;
+
+  beforeEach(() => {
+    store = new MemoryRoomStore();
+  });
+
+  async function createRoom() {
+    const { room, hostParticipant } = await store.createRoom({
+      roomCode: generateRoomCode(),
+      title: "Password Test Room",
+      capacity: 4,
+      hostName: "Host",
+      sessionSecret: "host-secret",
+    });
+    return { room, hostParticipant };
+  }
+
+  it("room starts with no password (open access)", async () => {
+    const { room } = await createRoom();
+    expect(room.roomPasswordHash).toBeNull();
+    // verifyRoomPassword returns true when no password set
+    const ok = await store.verifyRoomPassword(room.id, undefined);
+    expect(ok).toBe(true);
+  });
+
+  it("sets a room password with bcrypt hash", async () => {
+    const { room } = await createRoom();
+    const hash = await bcrypt.hash("secret123", 10);
+    await store.setRoomPassword(room.id, hash);
+
+    const updated = await store.getRoomById(room.id);
+    expect(updated?.roomPasswordHash).not.toBeNull();
+  });
+
+  it("verifies correct password successfully", async () => {
+    const { room } = await createRoom();
+    const hash = await bcrypt.hash("correct_pass", 10);
+    await store.setRoomPassword(room.id, hash);
+
+    const ok = await store.verifyRoomPassword(room.id, "correct_pass");
+    expect(ok).toBe(true);
+  });
+
+  it("rejects wrong password", async () => {
+    const { room } = await createRoom();
+    const hash = await bcrypt.hash("correct_pass", 10);
+    await store.setRoomPassword(room.id, hash);
+
+    const ok = await store.verifyRoomPassword(room.id, "wrong_pass");
+    expect(ok).toBe(false);
+  });
+
+  it("rejects undefined password when room has password set", async () => {
+    const { room } = await createRoom();
+    const hash = await bcrypt.hash("some_pass", 10);
+    await store.setRoomPassword(room.id, hash);
+
+    const ok = await store.verifyRoomPassword(room.id, undefined);
+    expect(ok).toBe(false);
+  });
+
+  it("clears password successfully (removes protection)", async () => {
+    const { room } = await createRoom();
+    const hash = await bcrypt.hash("some_pass", 10);
+    await store.setRoomPassword(room.id, hash);
+
+    // Clear the password
+    await store.setRoomPassword(room.id, null);
+
+    const updated = await store.getRoomById(room.id);
+    expect(updated?.roomPasswordHash).toBeNull();
+
+    // After clearing, any visitor should get in
+    const ok = await store.verifyRoomPassword(room.id, undefined);
+    expect(ok).toBe(true);
+  });
+
+  it("validates setRoomPasswordSchema — password max 50 chars", () => {
+    const valid = setRoomPasswordSchema.safeParse({
+      participantId: "part_abc",
+      sessionSecret: "sec_xyz",
+      password: "shortpass",
+    });
+    expect(valid.success).toBe(true);
+
+    const tooLong = setRoomPasswordSchema.safeParse({
+      participantId: "part_abc",
+      sessionSecret: "sec_xyz",
+      password: "a".repeat(51),
+    });
+    expect(tooLong.success).toBe(false);
+  });
+
+  it("kicked participant cannot re-auth session", async () => {
+    const { room, hostParticipant } = await createRoom();
+
+    // Guest joins
+    const { participant: guest } = await store.joinRoom(room.id, {
+      displayName: "Guest",
+      sessionSecret: "guest-secret",
+    });
+
+    // Host kicks the guest
+    await store.kickParticipant(guest.id);
+
+    // Guest tries to re-verify session — should fail because leftAt is set
+    const result = await store.verifyParticipantSession(room.id, guest.id, "guest-secret");
+    expect(result).toBeNull();
   });
 });
 

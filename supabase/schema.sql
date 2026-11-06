@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS "rooms" (
 	"capacity" integer DEFAULT 6 NOT NULL,
 	"status" varchar(24) DEFAULT 'active' NOT NULL,
 	"host_participant_id" varchar(64),
+	"room_password_hash" varchar(128),
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"expires_at" timestamp with time zone NOT NULL,
 	"settings" jsonb DEFAULT '{"allowScreenShare":true,"allowChat":true}'::jsonb
@@ -55,4 +56,3 @@ CREATE INDEX IF NOT EXISTS "participants_room_id_idx" ON "participants"("room_id
 CREATE INDEX IF NOT EXISTS "participants_left_at_idx" ON "participants"("left_at");
 CREATE INDEX IF NOT EXISTS "sessions_participant_idx" ON "room_sessions"("participant_id");
 CREATE INDEX IF NOT EXISTS "rate_limit_window_idx" ON "rate_limit_buckets"("window_started_at");
-

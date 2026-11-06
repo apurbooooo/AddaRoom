@@ -6,6 +6,7 @@ import {
   ParticipantRole,
 } from "@/types";
 import { generateSecureId, hashSessionSecret, verifySessionSecret } from "@/lib/crypto";
+import bcrypt from "bcryptjs";
 
 export interface CreateRoomInput {
   roomCode: string;
@@ -46,6 +47,10 @@ export interface IRoomStore {
     participantId: string,
     permissions: { canScreenShare?: boolean; isMutedByHost?: boolean }
   ): Promise<ParticipantModel>;
+  /** Set (or clear) a bcrypt-hashed room password. Pass null/undefined to remove. */
+  setRoomPassword(roomId: string, passwordHash: string | null): Promise<void>;
+  /** Verify a plaintext password against the stored hash. Returns true if no password set (open room). */
+  verifyRoomPassword(roomId: string, password: string | undefined): Promise<boolean>;
 }
 
 export class RoomFullError extends Error {
@@ -76,6 +81,16 @@ export class UnauthorizedHostError extends Error {
   }
 }
 
+export class RoomPasswordError extends Error {
+  constructor(
+    public readonly code: "PASSWORD_REQUIRED" | "WRONG_PASSWORD",
+    message = code === "PASSWORD_REQUIRED" ? "This room requires a password to join." : "Incorrect room password."
+  ) {
+    super(message);
+    this.name = "RoomPasswordError";
+  }
+}
+
 /**
  * MemoryRoomStore: High performance in-memory store for development, testing,
  * and zero-dependency environments.
@@ -85,6 +100,8 @@ export class MemoryRoomStore implements IRoomStore {
   private participants: Map<string, ParticipantModel> = new Map();
   private rateLimitBuckets = new Map<string, { startedAt: number; hits: number }>();
   private rateLimitOperations = 0;
+  /** roomId → bcrypt hash */
+  private roomPasswords = new Map<string, string>();
 
   async consumeRateLimit(key: string, limit: number, windowMs: number): Promise<boolean> {
     const now = Date.now();
@@ -115,6 +132,7 @@ export class MemoryRoomStore implements IRoomStore {
       capacity: input.capacity,
       status: "active",
       hostParticipantId: hostId,
+      roomPasswordHash: null,
       createdAt: now,
       expiresAt: expiresAt,
       settings: {
@@ -330,6 +348,26 @@ export class MemoryRoomStore implements IRoomStore {
       p.isMutedByHost = permissions.isMutedByHost;
     }
     return { ...p };
+  }
+
+  async setRoomPassword(roomId: string, passwordHash: string | null): Promise<void> {
+    const room = this.rooms.get(roomId);
+    if (!room) throw new Error("Room not found");
+    room.roomPasswordHash = passwordHash;
+    if (passwordHash) {
+      this.roomPasswords.set(roomId, passwordHash);
+    } else {
+      this.roomPasswords.delete(roomId);
+    }
+  }
+
+  async verifyRoomPassword(roomId: string, password: string | undefined): Promise<boolean> {
+    const room = this.rooms.get(roomId);
+    if (!room) return false;
+    const hash = room.roomPasswordHash;
+    if (!hash) return true; // no password set — open room
+    if (!password) return false; // password required but not provided
+    return bcrypt.compare(password, hash);
   }
 }
 

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Users, Lock, LogIn, Loader2, AlertCircle } from "lucide-react";
+import { Users, Lock, LogIn, Loader2, AlertCircle, KeyRound } from "lucide-react";
 import { PublicRoomInfo } from "@/types";
 import { saveRoomSession } from "@/lib/session-storage";
 
@@ -14,6 +14,7 @@ export function JoinRoomCard({ room }: JoinRoomCardProps) {
   const router = useRouter();
   const [displayName, setDisplayName] = useState("");
   const [avatar, setAvatar] = useState("👋");
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,11 +41,18 @@ export function JoinRoomCard({ room }: JoinRoomCardProps) {
         body: JSON.stringify({
           displayName: displayName.trim(),
           avatar,
+          ...(room.hasPassword ? { password } : {}),
         }),
       });
 
       const data = await res.json();
       if (!res.ok) {
+        const code = data.code || data.error;
+        if (code === "WRONG_PASSWORD") {
+          throw new Error("Incorrect password. Please try again.");
+        } else if (code === "PASSWORD_REQUIRED") {
+          throw new Error("This room requires a password to join.");
+        }
         throw new Error(data.message || data.error || "Failed to join room");
       }
 
@@ -149,6 +157,24 @@ export function JoinRoomCard({ room }: JoinRoomCardProps) {
               ))}
             </div>
           </div>
+
+          {/* Password field — only shown when room has a password set */}
+          {room.hasPassword && (
+            <div>
+              <label className="block text-xs font-semibold text-gray-300 mb-1.5 flex items-center gap-1.5">
+                <KeyRound className="w-3 h-3" />
+                Room Password
+              </label>
+              <input
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter room password..."
+                className="w-full px-3.5 py-2.5 rounded-xl bg-black border border-[#2a2a2a] text-sm text-white placeholder-gray-600 focus:outline-none focus:border-brand transition-colors"
+              />
+            </div>
+          )}
 
           <button
             type="submit"
