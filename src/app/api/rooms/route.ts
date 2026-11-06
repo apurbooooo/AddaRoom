@@ -77,7 +77,7 @@ export async function POST(req: Request) {
   } catch (error: any) {
     console.error("[API /api/rooms] Error creating room:", error?.message || error, error?.stack);
     return NextResponse.json(
-      { error: "Failed to create room. Please try again." },
+      { error: error?.message || "Failed to create room. Please try again." },
       { status: 500 }
     );
   }
