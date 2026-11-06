@@ -12,7 +12,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#030712",
+  themeColor: "#000000",
 };
 
 export default function RootLayout({
@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className="min-h-screen bg-slate-950 text-slate-100 flex flex-col" suppressHydrationWarning>
+      <body className="min-h-screen bg-black text-white flex flex-col" suppressHydrationWarning>
         {children}
       </body>
     </html>

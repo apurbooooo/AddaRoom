@@ -46,6 +46,10 @@ export function ParticipantTile({
       }
       if (track.kind === Track.Kind.Audio && audioRef.current && !isLocal) {
         track.attach(audioRef.current);
+        // Explicitly attempt playback after attach — required on some Android browsers
+        audioRef.current.play().catch(() => {
+          // Autoplay blocked — will be unblocked by room.startAudio() user gesture
+        });
       }
     };
 
@@ -88,6 +92,9 @@ export function ParticipantTile({
       const micPub = participant.getTrackPublication(Track.Source.Microphone);
       if (micPub && micPub.track && audioRef.current) {
         micPub.track.attach(audioRef.current);
+        audioRef.current.play().catch(() => {
+          // Will be unblocked on user gesture via room.startAudio()
+        });
       }
     }
 
@@ -117,10 +124,10 @@ export function ParticipantTile({
 
   return (
     <div
-      className={`relative w-full h-full min-h-[160px] rounded-2xl overflow-hidden bg-slate-900/90 border transition-all duration-300 flex items-center justify-center select-none shadow-md ${
+      className={`relative w-full h-full min-h-[160px] rounded-2xl overflow-hidden bg-[#111111] border transition-all duration-300 flex items-center justify-center select-none shadow-md ${
         isSpeaking
-          ? "border-indigo-500 shadow-indigo-500/20 ring-2 ring-indigo-500/40"
-          : "border-slate-800/80 hover:border-slate-700/80"
+          ? "border-brand shadow-brand/20 ring-2 ring-brand/40"
+          : "border-[#2a2a2a] hover:border-[#3a3a3a]"
       }`}
     >
       {/* Video element */}
@@ -139,12 +146,12 @@ export function ParticipantTile({
 
       {/* Fallback Avatar Placeholder when camera is off */}
       {!isVideoEnabled && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-slate-900 to-slate-950 p-4">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-b from-[#111111] to-black p-4">
           <div
             className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-3xl sm:text-4xl shadow-xl transition-transform duration-300 ${
               isSpeaking
-                ? "bg-indigo-600/30 ring-4 ring-indigo-500 scale-105"
-                : "bg-slate-800 ring-2 ring-slate-700"
+                ? "bg-brand/30 ring-4 ring-brand scale-105"
+                : "bg-[#1a1a1a] ring-2 ring-[#2a2a2a]"
             }`}
           >
             <span>{avatar}</span>
@@ -160,19 +167,19 @@ export function ParticipantTile({
           </span>
         )}
         {isHandRaised && (
-          <div className="p-1 rounded-md bg-amber-500 text-slate-950 shadow-md animate-bounce">
+          <div className="p-1 rounded-md bg-amber-500 text-black shadow-md animate-bounce">
             <Hand className="w-3.5 h-3.5" />
           </div>
         )}
         {isScreenSharing && (
-          <div className="p-1 rounded-md bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 text-[10px] flex items-center gap-1">
+          <div className="p-1 rounded-md bg-brand/20 text-brand border border-brand/30 text-[10px] flex items-center gap-1">
             <Monitor className="w-3 h-3" />
             <span className="text-[10px] font-medium hidden sm:inline">Sharing</span>
           </div>
         )}
       </div>
 
-      {/* Top Right: Connection Quality with metric tooltips */}
+      {/* Top Right: Connection Quality */}
       <div
         className="absolute top-2.5 right-2.5 z-20"
         onMouseEnter={() => setShowNetworkInfo(true)}
@@ -186,18 +193,18 @@ export function ParticipantTile({
         </div>
 
         {showNetworkInfo && (
-          <div className="absolute top-6 right-0 w-36 p-2 rounded-xl bg-slate-950 border border-slate-800 shadow-xl text-[10px] text-slate-300 z-30">
+          <div className="absolute top-6 right-0 w-36 p-2 rounded-xl bg-black border border-[#2a2a2a] shadow-xl text-[10px] text-gray-300 z-30">
             <p className="font-semibold text-white capitalize">{qualityStatus}</p>
-            <p className="text-slate-400 mt-0.5">LiveKit WebRTC SFU</p>
+            <p className="text-gray-400 mt-0.5">LiveKit WebRTC SFU</p>
           </div>
         )}
       </div>
 
       {/* Bottom Bar: Name & Mic status */}
       <div className="absolute bottom-2.5 left-2.5 right-2.5 flex items-center justify-between z-20 pointer-events-none">
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-xl bg-slate-950/75 border border-white/10 backdrop-blur-md text-xs text-white font-medium max-w-[80%] truncate">
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-xl bg-black/75 border border-white/10 backdrop-blur-md text-xs text-white font-medium max-w-[80%] truncate">
           <span className="truncate">{participant.name || participant.identity}</span>
-          {isLocal && <span className="text-[10px] text-indigo-400 font-bold">(You)</span>}
+          {isLocal && <span className="text-[10px] text-brand font-bold">(You)</span>}
         </div>
 
         <div className="flex items-center gap-1">
@@ -211,4 +218,3 @@ export function ParticipantTile({
     </div>
   );
 }
-

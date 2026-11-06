@@ -36,7 +36,7 @@ export async function createLiveKitToken(params: {
       avatar: params.avatar || "👋",
       isHost: params.isHost,
     }),
-    ttl: "10m", // Limit stale-token rejoin exposure on self-hosted LiveKit
+    ttl: "2h", // 2-hour TTL prevents expiry mid-session while still limiting stale-token exposure
   });
 
   at.addGrant({

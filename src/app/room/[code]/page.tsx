@@ -62,10 +62,10 @@ export default function RoomPage({
 
   if (loading || !session || !livekitToken || !livekitUrl) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-slate-100">
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-white">
         <div className="flex flex-col items-center gap-3">
-          <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
-          <p className="text-sm font-semibold text-slate-300">Authenticating room session...</p>
+          <Loader2 className="w-8 h-8 text-brand animate-spin" />
+          <p className="text-sm font-semibold text-gray-300">Authenticating room session...</p>
         </div>
       </div>
     );
@@ -80,4 +80,3 @@ export default function RoomPage({
     />
   );
 }
-

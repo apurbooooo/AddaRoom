@@ -8,6 +8,7 @@ import {
   Participant,
   RemoteParticipant,
   VideoPresets,
+  AudioCaptureOptions,
 } from "livekit-client";
 import { ParticipantGrid } from "@/components/media/participant-grid";
 import { RoomControlBar } from "@/components/room-control-bar";
@@ -17,11 +18,20 @@ import { HostControlsDialog } from "@/components/host/host-controls-dialog";
 import { FloatingReactions } from "@/components/social/floating-reactions";
 import { BrandLogo } from "@/components/brand-logo";
 import { useRoomDataChannel } from "@/hooks/use-room-data-channel";
+import { useAudioPlayback } from "@/hooks/use-audio-playback";
 import { ClientSession, PublicParticipant, ScreenShareQualityMode } from "@/types";
 import { getScreenShareOptions } from "@/lib/media-constraints";
 import { clearRoomSession } from "@/lib/session-storage";
 import { soundManager } from "@/lib/sound-effects";
-import { Loader2, AlertTriangle, Users, LogOut, X } from "lucide-react";
+import {
+  Loader2,
+  AlertTriangle,
+  Users,
+  X,
+  Volume2,
+  RefreshCw,
+  FlipHorizontal,
+} from "lucide-react";
 
 interface RoomViewProps {
   roomCode: string;
@@ -29,6 +39,13 @@ interface RoomViewProps {
   livekitToken: string;
   livekitUrl: string;
 }
+
+/** Browser-level audio constraints for best quality and noise reduction */
+const MIC_CAPTURE_OPTIONS: AudioCaptureOptions = {
+  noiseSuppression: true,
+  echoCancellation: true,
+  autoGainControl: true,
+};
 
 export function RoomView({
   roomCode,
@@ -41,12 +58,18 @@ export function RoomView({
   const [room, setRoom] = useState<Room | null>(null);
   const [connected, setConnected] = useState(false);
   const [connectingError, setConnectingError] = useState<string | null>(null);
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
-  // Media states
-  const [isMicEnabled, setIsMicEnabled] = useState(true);
+  // Media states — default mic to FALSE; we do NOT auto-start mic on connect
+  const [isMicEnabled, setIsMicEnabled] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [qualityMode, setQualityMode] = useState<ScreenShareQualityMode>("high");
+  const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+
+  // Mic permission / error state
+  const [micError, setMicError] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   // Participants state
   const [remoteParticipants, setRemoteParticipants] = useState<RemoteParticipant[]>([]);
@@ -76,6 +99,9 @@ export function RoomView({
     }, 1000);
     return () => clearInterval(timer);
   }, [connected]);
+
+  // Audio playback hook — handles iOS Safari audio unlock
+  const { canPlayAudio, startAudio } = useAudioPlayback(room ?? undefined);
 
   // LiveKit data channel hook
   const {
@@ -147,7 +173,9 @@ export function RoomView({
       dynacast: true,
       videoCaptureDefaults: {
         resolution: VideoPresets.h720.resolution,
+        facingMode: "user",
       },
+      audioCaptureDefaults: MIC_CAPTURE_OPTIONS,
     });
 
     const connectToRoom = async () => {
@@ -162,26 +190,21 @@ export function RoomView({
         setConnected(true);
         soundManager.playJoin();
 
-        // Enable initial mic
-        try {
-          await lkRoom.localParticipant.setMicrophoneEnabled(true);
-          setIsMicEnabled(true);
-        } catch {
-          setIsMicEnabled(false);
-        }
+        // *** DO NOT auto-enable mic here — requires user gesture on iOS ***
+        // Mic starts false (default) and user must tap the mic button.
 
         // Remote participants state
         const updateRemotes = () => {
           setRemoteParticipants(Array.from(lkRoom.remoteParticipants.values()));
         };
 
-        lkRoom.on(RoomEvent.ParticipantConnected, (p) => {
+        lkRoom.on(RoomEvent.ParticipantConnected, () => {
           soundManager.playJoin();
           updateRemotes();
           fetchRoomInfo();
         });
 
-        lkRoom.on(RoomEvent.ParticipantDisconnected, (p) => {
+        lkRoom.on(RoomEvent.ParticipantDisconnected, () => {
           soundManager.playLeave();
           updateRemotes();
           fetchRoomInfo();
@@ -197,6 +220,30 @@ export function RoomView({
 
         lkRoom.on(RoomEvent.Disconnected, () => {
           setConnected(false);
+          setIsReconnecting(false);
+        });
+
+        lkRoom.on(RoomEvent.Reconnecting, () => {
+          setIsReconnecting(true);
+        });
+
+        lkRoom.on(RoomEvent.Reconnected, () => {
+          setIsReconnecting(false);
+        });
+
+        // Sync track states if reconnecting with published tracks
+        lkRoom.on(RoomEvent.LocalTrackPublished, (pub) => {
+          if (pub.kind === "audio") setIsMicEnabled(true);
+          if (pub.kind === "video" && !lkRoom.localParticipant.isScreenShareEnabled) {
+            setIsVideoEnabled(true);
+          }
+        });
+
+        lkRoom.on(RoomEvent.LocalTrackUnpublished, (pub) => {
+          if (pub.kind === "audio") setIsMicEnabled(false);
+          if (pub.kind === "video" && !lkRoom.localParticipant.isScreenShareEnabled) {
+            setIsVideoEnabled(false);
+          }
         });
 
         updateRemotes();
@@ -214,26 +261,65 @@ export function RoomView({
     };
   }, [livekitUrl, livekitToken, fetchRoomInfo]);
 
-  // Media toggles
+  // ---- Media toggle handlers ----
+
   const handleToggleMic = async () => {
     if (!room) return;
+    setMicError(null);
     const next = !isMicEnabled;
     try {
-      await room.localParticipant.setMicrophoneEnabled(next);
+      await room.localParticipant.setMicrophoneEnabled(next, MIC_CAPTURE_OPTIONS);
+      // Only update state AFTER the LiveKit call succeeds
       setIsMicEnabled(next);
-    } catch (err) {
+    } catch (err: any) {
       console.warn("Failed to toggle mic:", err);
+      // Provide user-visible error
+      const msg =
+        err?.name === "NotAllowedError"
+          ? "Microphone permission denied. Please allow microphone access in your browser settings."
+          : err?.name === "NotFoundError"
+          ? "No microphone found. Please connect a microphone."
+          : err?.name === "NotReadableError"
+          ? "Microphone is in use by another app."
+          : "Could not access microphone. Please check your device.";
+      setMicError(msg);
+      // Do NOT change isMicEnabled — revert to actual state
     }
   };
 
   const handleToggleVideo = async () => {
     if (!room) return;
+    setCameraError(null);
     const next = !isVideoEnabled;
     try {
-      await room.localParticipant.setCameraEnabled(next);
+      await room.localParticipant.setCameraEnabled(next, { facingMode });
+      // Only update state AFTER the LiveKit call succeeds
       setIsVideoEnabled(next);
-    } catch (err) {
+    } catch (err: any) {
       console.warn("Failed to toggle camera:", err);
+      const msg =
+        err?.name === "NotAllowedError"
+          ? "Camera permission denied. Please allow camera access in your browser settings."
+          : err?.name === "NotFoundError"
+          ? "No camera found on this device."
+          : err?.name === "NotReadableError"
+          ? "Camera is in use by another app."
+          : "Could not access camera. Please check your device.";
+      setCameraError(msg);
+      // Do NOT change isVideoEnabled — revert to actual state
+    }
+  };
+
+  const handleFlipCamera = async () => {
+    if (!room || !isVideoEnabled) return;
+    const nextFacing = facingMode === "user" ? "environment" : "user";
+    setFacingMode(nextFacing);
+    try {
+      await room.localParticipant.setCameraEnabled(false);
+      await room.localParticipant.setCameraEnabled(true, { facingMode: nextFacing });
+    } catch (err) {
+      console.warn("Failed to flip camera:", err);
+      setFacingMode(facingMode); // revert
     }
   };
 
@@ -261,7 +347,8 @@ export function RoomView({
     toggleHandRaise(isHandRaised);
   };
 
-  // Host Action handlers
+  // ---- Host action handlers ----
+
   const handleUpdateLock = async (locked: boolean) => {
     const res = await fetch(`/api/rooms/${roomCode}/lock`, {
       method: "POST",
@@ -364,23 +451,23 @@ export function RoomView({
 
   if (connectingError) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-slate-100">
-        <div className="w-full max-w-md p-6 rounded-2xl bg-slate-900 border border-slate-800 text-center shadow-2xl">
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-white">
+        <div className="w-full max-w-md p-6 rounded-2xl bg-[#111111] border border-[#2a2a2a] text-center shadow-2xl">
           <div className="w-12 h-12 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center mx-auto mb-4">
             <AlertTriangle className="w-6 h-6" />
           </div>
           <h2 className="text-xl font-bold text-white mb-2">Media Connection Error</h2>
-          <p className="text-xs text-slate-400 mb-6">{connectingError}</p>
+          <p className="text-xs text-gray-400 mb-6">{connectingError}</p>
           <div className="flex gap-2 justify-center">
             <button
               onClick={() => window.location.reload()}
-              className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold"
+              className="px-4 py-2 rounded-xl bg-brand text-black text-xs font-bold hover:bg-[#ceff44] transition-colors"
             >
               Retry Connection
             </button>
             <button
               onClick={() => router.push("/")}
-              className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold"
+              className="px-4 py-2 rounded-xl bg-[#1a1a1a] hover:bg-[#2a2a2a] text-gray-300 text-xs font-semibold"
             >
               Back to Home
             </button>
@@ -392,13 +479,13 @@ export function RoomView({
 
   if (!connected) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-slate-100">
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-white">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center animate-pulse">
+          <div className="w-12 h-12 rounded-2xl bg-brand/20 text-brand border border-brand/30 flex items-center justify-center animate-pulse">
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>
-          <p className="text-sm font-semibold text-slate-300">Entering {roomTitle}...</p>
-          <p className="text-xs text-slate-500">Connecting to secure media SFU</p>
+          <p className="text-sm font-semibold text-white">Entering {roomTitle}...</p>
+          <p className="text-xs text-gray-500">Connecting to secure media SFU</p>
         </div>
       </div>
     );
@@ -407,32 +494,85 @@ export function RoomView({
   const isHost = session.role === "host";
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 flex flex-col select-none">
+    <div className="relative h-screen w-screen overflow-hidden bg-black text-white flex flex-col select-none">
       {/* Top Header Bar */}
-      <header className="h-14 border-b border-slate-800/80 bg-slate-950/80 px-4 flex items-center justify-between backdrop-blur-md z-30 flex-shrink-0">
+      <header className="h-14 border-b border-[#2a2a2a] bg-black/90 px-4 flex items-center justify-between backdrop-blur-md z-30 flex-shrink-0">
         <div className="flex items-center gap-3">
           <BrandLogo size="sm" />
-          <div className="h-4 w-[1px] bg-slate-800 hidden sm:block" />
+          <div className="h-4 w-[1px] bg-[#2a2a2a] hidden sm:block" />
           <div className="flex items-center gap-2">
             <span className="font-bold text-sm text-white truncate max-w-[140px] sm:max-w-xs">
               {roomTitle}
             </span>
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-slate-900 border border-slate-800 text-[11px] text-slate-400 font-medium">
-              <Users className="w-3 h-3 text-indigo-400" />
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#111111] border border-[#2a2a2a] text-[11px] text-gray-400 font-medium">
+              <Users className="w-3 h-3 text-brand" />
               <span>{remoteParticipants.length + 1}</span>
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
+          {isReconnecting && (
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[11px] font-semibold animate-pulse">
+              <RefreshCw className="w-3 h-3 animate-spin" />
+              <span>Reconnecting...</span>
+            </div>
+          )}
           <button
             onClick={() => setIsInviteOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/30 text-indigo-300 text-xs font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand text-xs font-semibold transition-colors"
           >
             <span>Invite</span>
           </button>
         </div>
       </header>
+
+      {/* iOS Safari / Android audio unlock banner */}
+      {!canPlayAudio && (
+        <div
+          className="bg-brand/10 border-b border-brand/30 px-4 py-2.5 flex items-center justify-between text-xs text-brand z-30 animate-in fade-in cursor-pointer"
+          onClick={startAudio}
+        >
+          <div className="flex items-center gap-2">
+            <Volume2 className="w-4 h-4 flex-shrink-0" />
+            <span>
+              <strong>Tap to enable audio</strong> — your browser blocked autoplay. Tap here to hear other participants.
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Mic permission error banner */}
+      {micError && (
+        <div className="bg-rose-500/10 border-b border-rose-500/30 px-4 py-2 flex items-center justify-between text-xs text-rose-300 z-30 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>{micError}</span>
+          </div>
+          <button
+            onClick={() => setMicError(null)}
+            className="p-1 rounded hover:bg-rose-500/20 ml-2 flex-shrink-0"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {/* Camera error banner */}
+      {cameraError && (
+        <div className="bg-rose-500/10 border-b border-rose-500/30 px-4 py-2 flex items-center justify-between text-xs text-rose-300 z-30 animate-in fade-in">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>{cameraError}</span>
+          </div>
+          <button
+            onClick={() => setCameraError(null)}
+            className="p-1 rounded hover:bg-rose-500/20 ml-2 flex-shrink-0"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
 
       {/* Free Tier Usage Advisory Banner (triggers when call reaches 90+ minutes) */}
       {sessionDurationSeconds >= 5400 && !dismissedUsageWarning && (
@@ -440,7 +580,10 @@ export function RoomView({
           <div className="flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0" />
             <span>
-              <strong>Free-Tier Usage Advisory:</strong> This room has been active for {Math.floor(sessionDurationSeconds / 60)} minutes (~{((sessionDurationSeconds / 3600) * (remoteParticipants.length + 1)).toFixed(1)} participant-hours). Free cloud accounts include ~100 participant-hours/month.
+              <strong>Free-Tier Usage Advisory:</strong> This room has been active for{" "}
+              {Math.floor(sessionDurationSeconds / 60)} minutes (~
+              {((sessionDurationSeconds / 3600) * (remoteParticipants.length + 1)).toFixed(1)}{" "}
+              participant-hours). Free cloud accounts include ~100 participant-hours/month.
             </span>
           </div>
           <button
@@ -493,6 +636,7 @@ export function RoomView({
         qualityMode={qualityMode}
         onToggleMic={handleToggleMic}
         onToggleVideo={handleToggleVideo}
+        onFlipCamera={handleFlipCamera}
         onToggleScreenShare={handleToggleScreenShare}
         onChangeQualityMode={setQualityMode}
         onSendReaction={sendReaction}
@@ -533,4 +677,3 @@ export function RoomView({
     </div>
   );
 }
-
