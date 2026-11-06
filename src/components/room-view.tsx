@@ -26,6 +26,7 @@ import { useNoiseFilter } from "@/hooks/use-noise-filter";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { ClientSession, PublicParticipant, ScreenShareQualityMode } from "@/types";
 import { getScreenShareOptions } from "@/lib/media-constraints";
+import { createRoomConnectionAttempt } from "@/lib/room-connection-lifecycle";
 import { clearRoomSession } from "@/lib/session-storage";
 import { soundManager } from "@/lib/sound-effects";
 import {
@@ -64,6 +65,9 @@ export function RoomView({
   const [connected, setConnected] = useState(false);
   const [connectingError, setConnectingError] = useState<string | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [connectionRetry, setConnectionRetry] = useState(0);
+  const connectionAttemptRef = useRef(0);
+  const roomRef = useRef<Room | null>(null);
 
   // Media states — default mic to FALSE; we do NOT auto-start mic on connect
   const [isMicEnabled, setIsMicEnabled] = useState(false);
@@ -188,9 +192,11 @@ export function RoomView({
     fetchRoomInfo();
   }, [fetchRoomInfo]);
 
-  // Connect to LiveKit Room
+  // Connect to LiveKit Room. This effect intentionally depends only on the
+  // connection inputs and explicit retry counter, never on Room-derived state.
   useEffect(() => {
     let active = true;
+    const attemptId = ++connectionAttemptRef.current;
     const lkRoom = new Room({
       adaptiveStream: true,
       dynacast: true,
@@ -200,104 +206,143 @@ export function RoomView({
       },
       audioCaptureDefaults: MIC_CAPTURE_OPTIONS,
     });
+    const logDiagnostic = (message: string, error?: unknown) => {
+      if (process.env.NODE_ENV !== "production") {
+        console.debug(`[LiveKit][attempt:${attemptId}] ${message}`, error ?? "");
+      }
+    };
+    logDiagnostic("Room instance created");
+    const updateRemotes = () => {
+      if (active) setRemoteParticipants(Array.from(lkRoom.remoteParticipants.values()));
+    };
+    const handleConnected = () => {
+      if (!active) return;
+      logDiagnostic("connection successful");
+      roomRef.current = lkRoom;
+      setRoom(lkRoom);
+      setConnected(true);
+      setConnectingError(null);
+      setIsReconnecting(false);
+      soundManager.playJoin();
+      updateRemotes();
+    };
+    const handleDisconnected = (reason?: unknown) => {
+      logDiagnostic("room disconnected event", reason);
+      if (!active) return;
+      roomRef.current = null;
+      setRoom(null);
+      setConnected(false);
+      setIsReconnecting(false);
+      setConnectingError(
+        reason ? `Disconnected from the media server (${String(reason)}).` : "Disconnected from the media server."
+      );
+    };
+    const handleReconnecting = () => {
+      if (!active) return;
+      logDiagnostic("room reconnecting");
+      setIsReconnecting(true);
+    };
+    const handleReconnected = () => {
+      if (!active) return;
+      logDiagnostic("room reconnected");
+      setIsReconnecting(false);
+      const pub = lkRoom.localParticipant.getTrackPublication(Track.Source.Microphone);
+      if (pub?.track) {
+        reapplyKrispIfNeeded(pub.track as LocalAudioTrack).catch((error) => {
+          logDiagnostic("Krisp reapply failed after reconnect", error);
+        });
+      }
+    };
+    const handleParticipantConnected = () => {
+      if (!active) return;
+      soundManager.playJoin();
+      updateRemotes();
+      fetchRoomInfo();
+    };
+    const handleParticipantDisconnected = () => {
+      if (!active) return;
+      soundManager.playLeave();
+      updateRemotes();
+      fetchRoomInfo();
+    };
+    const handleLocalTrackPublished = (pub: any) => {
+      if (!active) return;
+      setIsScreenSharing(lkRoom.localParticipant.isScreenShareEnabled);
+      if (pub.kind === "audio") {
+        setIsMicEnabled(true);
+        if (pub.track) {
+          reapplyKrispIfNeeded(pub.track as LocalAudioTrack).catch((error) => {
+            logDiagnostic("Krisp reapply failed after publish", error);
+          });
+        }
+      }
+      if (pub.kind === "video" && !lkRoom.localParticipant.isScreenShareEnabled) {
+        setIsVideoEnabled(true);
+      }
+    };
+    const handleLocalTrackUnpublished = (pub: any) => {
+      if (!active) return;
+      setIsScreenSharing(lkRoom.localParticipant.isScreenShareEnabled);
+      if (pub.kind === "audio") setIsMicEnabled(false);
+      if (pub.kind === "video" && !lkRoom.localParticipant.isScreenShareEnabled) {
+        setIsVideoEnabled(false);
+      }
+    };
+    const handleActiveSpeakersChanged = (speakers: Participant[]) => {
+      if (active) setSpeakingParticipantIds(speakers.map((speaker) => speaker.identity));
+    };
+
+    const connectionAttempt = createRoomConnectionAttempt(
+      lkRoom,
+      livekitUrl,
+      livekitToken,
+      [
+        { event: RoomEvent.Connected, handler: handleConnected },
+        { event: RoomEvent.Disconnected, handler: handleDisconnected },
+        { event: RoomEvent.Reconnecting, handler: handleReconnecting },
+        { event: RoomEvent.SignalReconnecting, handler: handleReconnecting },
+        { event: RoomEvent.Reconnected, handler: handleReconnected },
+        { event: RoomEvent.ParticipantConnected, handler: handleParticipantConnected },
+        { event: RoomEvent.ParticipantDisconnected, handler: handleParticipantDisconnected },
+        { event: RoomEvent.LocalTrackPublished, handler: handleLocalTrackPublished },
+        { event: RoomEvent.LocalTrackUnpublished, handler: handleLocalTrackUnpublished },
+        { event: RoomEvent.ActiveSpeakersChanged, handler: handleActiveSpeakersChanged },
+      ],
+    );
 
     const connectToRoom = async () => {
+      logDiagnostic("connection attempt started");
       try {
-        await lkRoom.connect(livekitUrl, livekitToken);
+        await connectionAttempt.connect();
         if (!active) {
-          lkRoom.disconnect();
+          connectionAttempt.cleanup();
           return;
         }
-
-        setRoom(lkRoom);
-        setConnected(true);
-        soundManager.playJoin();
-
-        // *** DO NOT auto-enable mic here — requires user gesture on iOS ***
-        // Mic starts false (default) and user must tap the mic button.
-
-        // Remote participants state
-        const updateRemotes = () => {
-          setRemoteParticipants(Array.from(lkRoom.remoteParticipants.values()));
-        };
-
-        lkRoom.on(RoomEvent.ParticipantConnected, () => {
-          soundManager.playJoin();
-          updateRemotes();
-          fetchRoomInfo();
-        });
-
-        lkRoom.on(RoomEvent.ParticipantDisconnected, () => {
-          soundManager.playLeave();
-          updateRemotes();
-          fetchRoomInfo();
-        });
-
-        lkRoom.on(RoomEvent.LocalTrackPublished, () => {
-          setIsScreenSharing(lkRoom.localParticipant.isScreenShareEnabled);
-        });
-
-        lkRoom.on(RoomEvent.LocalTrackUnpublished, () => {
-          setIsScreenSharing(lkRoom.localParticipant.isScreenShareEnabled);
-        });
-
-        lkRoom.on(RoomEvent.Disconnected, () => {
-          setConnected(false);
-          setIsReconnecting(false);
-        });
-
-        lkRoom.on(RoomEvent.Reconnecting, () => {
-          setIsReconnecting(true);
-        });
-
-        lkRoom.on(RoomEvent.Reconnected, () => {
-          setIsReconnecting(false);
-          const pub = lkRoom.localParticipant.getTrackPublication(Track.Source.Microphone);
-          if (pub?.track) {
-            reapplyKrispIfNeeded(pub.track as LocalAudioTrack).catch(() => {});
-          }
-        });
-
-        // Track active speakers for the left sidebar speaking indicators
-        lkRoom.on(RoomEvent.ActiveSpeakersChanged, (speakers: Participant[]) => {
-          setSpeakingParticipantIds(speakers.map((s) => s.identity));
-        });
-
-        // Sync track states if reconnecting with published tracks
-        lkRoom.on(RoomEvent.LocalTrackPublished, (pub) => {
-          if (pub.kind === "audio") {
-            setIsMicEnabled(true);
-            if (pub.track) {
-              reapplyKrispIfNeeded(pub.track as LocalAudioTrack).catch(() => {});
-            }
-          }
-          if (pub.kind === "video" && !lkRoom.localParticipant.isScreenShareEnabled) {
-            setIsVideoEnabled(true);
-          }
-        });
-
-        lkRoom.on(RoomEvent.LocalTrackUnpublished, (pub) => {
-          if (pub.kind === "audio") setIsMicEnabled(false);
-          if (pub.kind === "video" && !lkRoom.localParticipant.isScreenShareEnabled) {
-            setIsVideoEnabled(false);
-          }
-        });
-
-        updateRemotes();
+        if (lkRoom.state !== "connected") {
+          handleConnected();
+        }
       } catch (err: any) {
-        console.error("Failed to connect to LiveKit:", err);
-        setConnectingError(err.message || "Could not connect to media server");
+        if (!active) return;
+        logDiagnostic("connection failed", err);
+        setConnectingError(err?.message || "Could not connect to media server.");
+        setConnected(false);
+        roomRef.current = null;
+        setRoom(null);
+        connectionAttempt.cleanup();
       }
     };
 
     connectToRoom();
 
     return () => {
+      logDiagnostic("connection effect cleanup");
       active = false;
       cleanupKrisp().catch(() => {});
-      lkRoom.disconnect();
+      roomRef.current = roomRef.current === lkRoom ? null : roomRef.current;
+      if (roomRef.current === null) setRoom(null);
+      connectionAttempt.cleanup();
     };
-  }, [livekitUrl, livekitToken, fetchRoomInfo, cleanupKrisp]);
+  }, [livekitUrl, livekitToken, fetchRoomInfo, cleanupKrisp, reapplyKrispIfNeeded, connectionRetry]);
 
   // ---- Media toggle handlers ----
 
@@ -551,7 +596,11 @@ export function RoomView({
           <p className="text-xs text-gray-400 mb-6">{connectingError}</p>
           <div className="flex gap-2 justify-center">
             <button
-              onClick={() => window.location.reload()}
+              onClick={() => {
+                setConnectingError(null);
+                setIsReconnecting(false);
+                setConnectionRetry((retry) => retry + 1);
+              }}
               className="px-4 py-2 rounded-xl bg-brand text-black text-xs font-bold hover:bg-[#ceff44] transition-colors"
             >
               Retry Connection

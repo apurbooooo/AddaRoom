@@ -104,6 +104,11 @@ export interface UseNoiseFilterResult {
  */
 export function useNoiseFilter(options?: UseNoiseFilterOptions): UseNoiseFilterResult {
   const room = options?.room;
+  const roomRef = useRef<Room | null>(room ?? null);
+
+  useEffect(() => {
+    roomRef.current = room ?? null;
+  }, [room]);
 
   // 1. Basic WebRTC Noise Reduction
   const [isNoiseEnabled, setIsNoiseEnabled] = useState<boolean>(() => readPersistedNoise());
@@ -136,18 +141,19 @@ export function useNoiseFilter(options?: UseNoiseFilterOptions): UseNoiseFilterR
   }, [isNoiseEnabled, setNoiseEnabled]);
 
   const getLocalMicrophoneTrack = useCallback((): LocalAudioTrack | null => {
-    if (!room) return null;
-    const pub = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+    const currentRoom = roomRef.current;
+    if (!currentRoom) return null;
+    const pub = currentRoom.localParticipant.getTrackPublication(Track.Source.Microphone);
     if (pub?.track && pub.track.kind === Track.Kind.Audio) {
       return pub.track as LocalAudioTrack;
     }
-    for (const p of room.localParticipant.audioTrackPublications.values()) {
+    for (const p of currentRoom.localParticipant.audioTrackPublications.values()) {
       if (p.track && p.track.kind === Track.Kind.Audio) {
         return p.track as LocalAudioTrack;
       }
     }
     return null;
-  }, [room]);
+  }, []);
 
   const setKrispEnabled = useCallback(
     async (enabled: boolean, overrideTrack?: LocalAudioTrack | null): Promise<boolean> => {
