@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { MemoryRoomStore, RoomFullError } from "../db/room-store";
 import { generateRoomCode, hashSessionSecret, verifySessionSecret } from "@/lib/crypto";
-import { createRoomSchema, joinRoomSchema, setRoomPasswordSchema } from "@/lib/validations";
+import { createRoomSchema, joinRoomSchema, setRoomPasswordSchema, moderateRoomSchema } from "@/lib/validations";
 import bcrypt from "bcryptjs";
 
 describe("AddaRoom Security, Crypto & API Validations", () => {
@@ -285,8 +285,60 @@ describe("Room Password Feature", () => {
     expect(tooLong.success).toBe(false);
   });
 
+  it("validates moderateRoomSchema — requires explicit boolean for mute action", () => {
+    const validMute = moderateRoomSchema.safeParse({
+      participantId: "part_host",
+      sessionSecret: "sec_123",
+      action: "mute",
+      targetParticipantId: "part_target",
+      muted: true,
+    });
+    expect(validMute.success).toBe(true);
+
+    const invalidMute = moderateRoomSchema.safeParse({
+      participantId: "part_host",
+      sessionSecret: "sec_123",
+      action: "mute",
+      targetParticipantId: "part_target",
+    });
+    expect(invalidMute.success).toBe(false);
+
+    const validKick = moderateRoomSchema.safeParse({
+      participantId: "part_host",
+      sessionSecret: "sec_123",
+      action: "kick",
+      targetParticipantId: "part_target",
+    });
+    expect(validKick.success).toBe(true);
+
+    const invalidAction = moderateRoomSchema.safeParse({
+      participantId: "part_host",
+      sessionSecret: "sec_123",
+      action: "ban_forever",
+      targetParticipantId: "part_target",
+    });
+    expect(invalidAction.success).toBe(false);
+  });
+
+  it("updates participant permissions for mute and screen share", async () => {
+    const { room } = await createRoom();
+    const { participant: guest } = await store.joinRoom(room.id, {
+      displayName: "Guest",
+      sessionSecret: "guest-secret",
+    });
+
+    expect(guest.isMutedByHost).toBe(false);
+    expect(guest.canScreenShare).toBe(true);
+
+    const mutedGuest = await store.updateParticipantPermissions(guest.id, { isMutedByHost: true });
+    expect(mutedGuest.isMutedByHost).toBe(true);
+
+    const restrictedGuest = await store.updateParticipantPermissions(guest.id, { canScreenShare: false });
+    expect(restrictedGuest.canScreenShare).toBe(false);
+  });
+
   it("kicked participant cannot re-auth session", async () => {
-    const { room, hostParticipant } = await createRoom();
+    const { room } = await createRoom();
 
     // Guest joins
     const { participant: guest } = await store.joinRoom(room.id, {

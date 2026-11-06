@@ -32,7 +32,7 @@ export function BrandLogo({ size = "md", withTagline = false }: BrandLogoProps) 
           <span className={`font-extrabold tracking-tight text-white ${textSizes[size]}`}>
             Adda<span className="text-brand">Room</span>
           </span>
-          <span className="text-[10px] font-semibold tracking-wider uppercase px-1.5 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20">
+          <span className="text-[10px] font-semibold tracking-wider uppercase px-1.5 py-0.5 rounded-full bg-brand/10 text-brand border border-brand/20 hidden sm:inline-block">
             FOSS
           </span>
         </div>

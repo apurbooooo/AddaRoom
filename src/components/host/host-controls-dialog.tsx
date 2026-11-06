@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Lock, Unlock, ShieldAlert, UserMinus, Crown, Edit3, X, Check, Activity, Clock, KeyRound, KeySquare, Loader2 } from "lucide-react";
+import { Lock, Unlock, ShieldAlert, UserMinus, Crown, Edit3, X, Check, Activity, Clock, KeyRound, KeySquare, Loader2, Mic, MicOff, Monitor, MonitorOff } from "lucide-react";
 import { PublicParticipant } from "@/types";
 
 interface HostControlsDialogProps {
@@ -13,10 +13,13 @@ interface HostControlsDialogProps {
   hasPassword: boolean;
   participants: PublicParticipant[];
   currentParticipantId: string;
+  actionError?: string | null;
   sessionDurationSeconds?: number;
   onUpdateLock: (locked: boolean) => Promise<void>;
   onUpdateTitle: (title: string) => Promise<void>;
   onKickParticipant: (targetParticipantId: string) => Promise<void>;
+  onMuteParticipant: (targetParticipantId: string, muted: boolean) => Promise<void>;
+  onSetScreenSharePermission: (targetParticipantId: string, allowed: boolean) => Promise<void>;
   onTransferHost: (targetParticipantId: string) => Promise<void>;
   onEndRoom: () => Promise<void>;
   onSetPassword: (password: string | null) => Promise<void>;
@@ -31,10 +34,13 @@ export function HostControlsDialog({
   hasPassword,
   participants,
   currentParticipantId,
+  actionError,
   sessionDurationSeconds = 0,
   onUpdateLock,
   onUpdateTitle,
   onKickParticipant,
+  onMuteParticipant,
+  onSetScreenSharePermission,
   onTransferHost,
   onEndRoom,
   onSetPassword,
@@ -77,6 +83,18 @@ export function HostControlsDialog({
     } finally {
       setLoadingAction(null);
     }
+  };
+
+  const handleMute = async (id: string, muted: boolean) => {
+    setLoadingAction(`mute_${id}`);
+    try { await onMuteParticipant(id, muted); }
+    finally { setLoadingAction(null); }
+  };
+
+  const handleScreenShare = async (id: string, allowed: boolean) => {
+    setLoadingAction(`share_${id}`);
+    try { await onSetScreenSharePermission(id, allowed); }
+    finally { setLoadingAction(null); }
   };
 
   const handleTransfer = async (id: string) => {
@@ -122,11 +140,12 @@ export function HostControlsDialog({
   const otherParticipants = participants.filter((p) => p.id !== currentParticipantId);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="relative w-full max-w-lg rounded-2xl bg-[#111111] border border-[#2a2a2a] p-6 shadow-2xl text-white max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 max-sm:items-end max-sm:p-0">
+      <div className="relative w-full max-w-lg rounded-2xl bg-[#111111] border border-[#2a2a2a] p-6 shadow-2xl text-white max-h-[90dvh] overflow-y-auto max-sm:max-w-none max-sm:rounded-t-3xl max-sm:rounded-b-none max-sm:border-b-0 max-sm:px-4 max-sm:pb-[calc(1.5rem+env(safe-area-inset-bottom))]">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 p-2 text-gray-400 hover:text-white rounded-lg hover:bg-[#1a1a1a] transition-colors"
+                  className="absolute top-3 right-3 min-w-11 min-h-11 grid place-items-center text-gray-400 hover:text-white rounded-lg hover:bg-[#1a1a1a] transition-colors"
+          aria-label="Close host controls"
         >
           <X className="w-5 h-5" />
         </button>
@@ -140,6 +159,8 @@ export function HostControlsDialog({
             <p className="text-xs text-gray-400">Manage room permissions and participants</p>
           </div>
         </div>
+
+        {actionError && <p className="mb-4 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200" role="alert">{actionError}</p>}
 
         {/* Room Title Edit */}
         <div className="mb-5 p-3.5 rounded-xl bg-black border border-[#2a2a2a]">
@@ -312,18 +333,38 @@ export function HostControlsDialog({
               {otherParticipants.map((p) => (
                 <div
                   key={p.id}
-                  className="flex items-center justify-between p-2.5 rounded-xl bg-black border border-[#2a2a2a] text-xs"
+                  className="flex flex-wrap items-center justify-between gap-2 p-2.5 rounded-xl bg-black border border-[#2a2a2a] text-xs"
                 >
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
                     <span className="text-base">{p.avatar || "👤"}</span>
-                    <span className="font-semibold text-gray-200">{p.displayName}</span>
+                    <span className="font-semibold text-gray-200 truncate">{p.displayName}</span>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center justify-end gap-1.5">
+                    <button
+                      onClick={() => handleMute(p.id, !p.isMutedByHost)}
+                      disabled={loadingAction === `mute_${p.id}`}
+                      className="min-h-11 min-w-11 sm:px-3 rounded-xl bg-[#171717] border border-[#303030] hover:border-brand/50 text-gray-200 text-[11px] font-medium flex items-center justify-center gap-1.5 disabled:opacity-50"
+                      aria-label={`${p.isMutedByHost ? "Unmute" : "Mute"} ${p.displayName}`}
+                      title={p.isMutedByHost ? "Allow microphone" : "Mute microphone"}
+                    >
+                      {loadingAction === `mute_${p.id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : p.isMutedByHost ? <Mic className="w-4 h-4 text-brand" /> : <MicOff className="w-4 h-4" />}
+                      <span className="hidden sm:inline">{p.isMutedByHost ? "Unmute" : "Mute"}</span>
+                    </button>
+                    <button
+                      onClick={() => handleScreenShare(p.id, !p.canScreenShare)}
+                      disabled={loadingAction === `share_${p.id}`}
+                      className="min-h-11 min-w-11 sm:px-3 rounded-xl bg-[#171717] border border-[#303030] hover:border-brand/50 text-gray-200 text-[11px] font-medium flex items-center justify-center gap-1.5 disabled:opacity-50"
+                      aria-label={`${p.canScreenShare ? "Disable" : "Allow"} screen sharing for ${p.displayName}`}
+                      title={p.canScreenShare ? "Disable screen sharing" : "Allow screen sharing"}
+                    >
+                      {loadingAction === `share_${p.id}` ? <Loader2 className="w-4 h-4 animate-spin" /> : p.canScreenShare ? <Monitor className="w-4 h-4 text-brand" /> : <MonitorOff className="w-4 h-4" />}
+                      <span className="hidden sm:inline">{p.canScreenShare ? "Share on" : "Share off"}</span>
+                    </button>
                     <button
                       onClick={() => handleTransfer(p.id)}
                       disabled={loadingAction === `transfer_${p.id}`}
-                      className="px-2 py-1 rounded-lg bg-[#1a1a1a] hover:bg-[#2a2a2a] text-amber-300 text-[11px] font-medium flex items-center gap-1 transition-colors min-h-[32px]"
+                      className="px-3 rounded-xl bg-[#171717] border border-[#303030] hover:border-brand/50 text-gray-200 text-[11px] font-medium flex items-center gap-1 transition-colors min-h-[44px]"
                       title="Make Host"
                     >
                       <Crown className="w-3 h-3" /> Make Host
@@ -331,8 +372,9 @@ export function HostControlsDialog({
                     <button
                       onClick={() => handleKick(p.id)}
                       disabled={loadingAction === `kick_${p.id}`}
-                      className="p-1.5 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors min-w-[32px] min-h-[32px] flex items-center justify-center"
+                      className="p-2 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center"
                       title="Remove participant"
+                      aria-label={`Remove ${p.displayName} from room`}
                     >
                       <UserMinus className="w-3.5 h-3.5" />
                     </button>

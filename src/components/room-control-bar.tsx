@@ -26,6 +26,7 @@ import {
   Loader2,
   X,
   AlertCircle,
+  MoreHorizontal,
 } from "lucide-react";
 import { ScreenShareQualityMode } from "@/types";
 import { soundManager } from "@/lib/sound-effects";
@@ -44,6 +45,9 @@ interface RoomControlBarProps {
   isNoiseEnabled: boolean;
   isBrowserProcessingSupported: boolean;
   isFullscreen: boolean;
+  isFullscreenSupported: boolean;
+  isMicAllowed: boolean;
+  isScreenShareAllowed: boolean;
   krispState?: KrispState;
   isKrispSupported?: boolean;
   krispErrorMessage?: string | null;
@@ -81,6 +85,9 @@ export function RoomControlBar({
   isNoiseEnabled,
   isBrowserProcessingSupported,
   isFullscreen,
+  isFullscreenSupported,
+  isMicAllowed,
+  isScreenShareAllowed,
   krispState = "off",
   isKrispSupported = true,
   krispErrorMessage = null,
@@ -102,6 +109,7 @@ export function RoomControlBar({
   const [showReactions, setShowReactions] = useState(false);
   const [showQualityMenu, setShowQualityMenu] = useState(false);
   const [showAudioSettings, setShowAudioSettings] = useState(false);
+  const [showMobileMore, setShowMobileMore] = useState(false);
   const [soundOn, setSoundOn] = useState(soundManager.isEnabled());
   const [mobileScreenShareWarning, setMobileScreenShareWarning] = useState<string | null>(null);
 
@@ -137,7 +145,7 @@ export function RoomControlBar({
 
       {/* Floating Reactions Bar */}
       {showReactions && (
-        <div className="absolute -top-14 left-1/2 -translate-x-1/2 flex items-center gap-1.5 p-1.5 rounded-2xl bg-[#111111] border border-[#2a2a2a] shadow-2xl backdrop-blur-md animate-in slide-in-from-bottom-2 duration-150">
+      <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 max-w-[calc(100vw-1rem)] overflow-x-auto flex items-center gap-1.5 p-1.5 rounded-2xl bg-[#111111] border border-[#2a2a2a] shadow-2xl backdrop-blur-md z-50 animate-in slide-in-from-bottom-2 duration-150">
           {reactionsList.map((emoji) => (
             <button
               key={emoji}
@@ -169,7 +177,7 @@ export function RoomControlBar({
 
       {/* Quality preset menu popover */}
       {showQualityMenu && (
-        <div className="absolute -top-36 left-1/2 -translate-x-1/2 sm:left-auto sm:translate-x-0 w-48 p-2 rounded-2xl bg-[#111111] border border-[#2a2a2a] shadow-2xl text-xs space-y-1 animate-in fade-in duration-150">
+        <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 sm:left-auto sm:translate-x-0 w-48 p-2 rounded-2xl bg-[#111111] border border-[#2a2a2a] shadow-2xl text-xs space-y-1 z-50 animate-in fade-in duration-150">
           <p className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-gray-400">
             Screen Share Mode
           </p>
@@ -200,9 +208,10 @@ export function RoomControlBar({
         </div>
       )}
 
-      <div className="max-w-4xl mx-auto flex items-center justify-between gap-1 sm:gap-3 min-w-0 max-sm:overflow-x-auto max-sm:justify-start max-sm:touch-pan-x">
+      {/* Desktop Bar (sm: and up) */}
+      <div className="hidden sm:flex max-w-6xl mx-auto items-center justify-between gap-4 min-w-0">
         {/* Left Side: Room Extras (Invite, Host Controls, Sound, Noise) */}
-        <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
           <button
             onClick={onOpenInvite}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#111111] hover:bg-[#1a1a1a] border border-[#2a2a2a] text-gray-200 text-xs font-semibold transition-colors min-h-[44px]"
@@ -233,9 +242,8 @@ export function RoomControlBar({
 
         </div>
 
-        {/* Center: Primary Media Controls — horizontally scrollable on small screens */}
-        <div className="relative flex-1 min-w-0 max-sm:flex-none max-sm:w-max">
-          <div className="flex overflow-x-auto max-sm:overflow-visible scrollbar-none items-center justify-start sm:justify-center gap-1.5 sm:gap-2 min-w-0 touch-pan-x overscroll-x-contain">
+        {/* Center: Primary Media Controls */}
+        <div className="relative flex-1 min-w-0 flex items-center justify-center gap-2.5">
           {/* Audio settings button with indicator when Krisp is ON */}
           <div className="relative flex-shrink-0">
             <button
@@ -293,12 +301,14 @@ export function RoomControlBar({
           {/* Mic */}
           <button
             onClick={onToggleMic}
+            disabled={!isMicAllowed && !isMicEnabled}
             className={`p-3 rounded-2xl transition-all shadow-md min-w-[48px] min-h-[48px] flex items-center justify-center flex-shrink-0 ${
               isMicEnabled
                 ? "bg-[#1a1a1a] hover:bg-[#2a2a2a] text-white border border-[#2a2a2a]"
                 : "bg-rose-600 hover:bg-rose-500 text-white"
             }`}
-            title={isMicEnabled ? "Mute Microphone" : "Unmute Microphone"}
+            title={!isMicAllowed ? "The host has muted your microphone" : isMicEnabled ? "Mute Microphone" : "Unmute Microphone"}
+            aria-label={!isMicAllowed ? "Microphone muted by host" : isMicEnabled ? "Mute microphone" : "Unmute microphone"}
           >
             {isMicEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
           </button>
@@ -336,12 +346,14 @@ export function RoomControlBar({
           <div className="relative flex items-center flex-shrink-0">
             <button
               onClick={handleScreenShareClick}
+              disabled={!isScreenShareAllowed && !isScreenSharing}
               className={`p-3 rounded-l-2xl transition-all shadow-md min-w-[48px] min-h-[48px] flex items-center justify-center ${
                 isScreenSharing
                   ? "bg-brand hover:bg-[#ceff44] text-black"
                   : "bg-[#1a1a1a] hover:bg-[#2a2a2a] text-gray-200 border border-[#2a2a2a]"
               }`}
-              title={isScreenSharing ? "Stop Screen Share" : "Share Screen"}
+              title={!isScreenShareAllowed ? "The host has disabled screen sharing" : isScreenSharing ? "Stop Screen Share" : "Share Screen"}
+              aria-label={!isScreenShareAllowed ? "Screen sharing disabled by host" : isScreenSharing ? "Stop screen share" : "Share screen"}
             >
               <Monitor className="w-5 h-5" />
             </button>
@@ -499,7 +511,6 @@ export function RoomControlBar({
               </div>
             </div>
           )}
-          </div>
 
           {/* Reactions Toggle */}
           <button
@@ -516,8 +527,9 @@ export function RoomControlBar({
           {/* Fullscreen Toggle */}
           <button
             onClick={onToggleFullscreen}
-            className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition-colors min-w-[44px] min-h-[44px] hidden sm:flex items-center justify-center"
-            title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+            className="p-2 rounded-xl text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition-colors min-w-[48px] min-h-[48px] flex items-center justify-center"
+            title={isFullscreenSupported ? isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen" : "Fullscreen is not supported here; rotate the device or use AddaRoom in standalone mode"}
+            aria-label={isFullscreenSupported ? isFullscreen ? "Exit fullscreen" : "Enter fullscreen" : "Fullscreen unavailable. Rotate your device for a wider view."}
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
           </button>
@@ -525,6 +537,7 @@ export function RoomControlBar({
           {/* Chat Drawer Toggle */}
           <button
             onClick={onToggleChat}
+            aria-label={isChatOpen ? "Close room chat" : unreadCount > 0 ? `Open room chat, ${unreadCount} unread messages` : "Open room chat"}
             className={`relative p-3 rounded-2xl transition-colors shadow-md min-w-[48px] min-h-[48px] flex items-center justify-center ${
               isChatOpen
                 ? "bg-brand text-black"
@@ -540,9 +553,10 @@ export function RoomControlBar({
             )}
           </button>
 
-          {/* Leave Room Button — always visible */}
+          {/* Leave Room Button */}
           <button
             onClick={onLeaveRoom}
+            aria-label="Leave room"
             className="p-3 rounded-2xl bg-rose-600/20 hover:bg-rose-600 border border-rose-600/40 text-rose-300 hover:text-white transition-all shadow-md group min-w-[48px] min-h-[48px] flex items-center justify-center"
             title="Leave Room"
           >
@@ -550,6 +564,322 @@ export function RoomControlBar({
           </button>
         </div>
       </div>
+
+      {/* Mobile Bar (< sm: 320px to 639px) — Exactly 6 touch targets, zero horizontal scrolling */}
+      <div className="flex sm:hidden items-center justify-between gap-1 w-full max-w-md mx-auto">
+        {/* 1. Mic */}
+        <button
+          onClick={onToggleMic}
+          disabled={!isMicAllowed && !isMicEnabled}
+          className={`min-w-11 min-h-11 w-11 h-11 xs:w-12 xs:h-12 rounded-2xl flex items-center justify-center transition-all flex-shrink-0 shadow-md ${
+            isMicEnabled
+              ? "bg-[#1a1a1a] text-white border border-[#2a2a2a] active:bg-[#252525]"
+              : "bg-rose-600 text-white active:bg-rose-700"
+          }`}
+          title={!isMicAllowed ? "Muted by host" : isMicEnabled ? "Mute" : "Unmute"}
+          aria-label={!isMicAllowed ? "Muted by host" : isMicEnabled ? "Mute microphone" : "Unmute microphone"}
+        >
+          {isMicEnabled ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
+        </button>
+
+        {/* 2. Video (+ quick flip badge when video on) */}
+        <div className="relative flex items-center flex-shrink-0">
+          <button
+            onClick={onToggleVideo}
+            className={`min-w-11 min-h-11 w-11 h-11 xs:w-12 xs:h-12 rounded-2xl flex items-center justify-center transition-all shadow-md ${
+              isVideoEnabled
+                ? "bg-[#1a1a1a] text-white border border-[#2a2a2a] active:bg-[#252525]"
+                : "bg-rose-600 text-white active:bg-rose-700"
+            }`}
+            title={isVideoEnabled ? "Turn off camera" : "Turn on camera"}
+            aria-label={isVideoEnabled ? "Turn off camera" : "Turn on camera"}
+          >
+            {isVideoEnabled ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
+          </button>
+          {onFlipCamera && isVideoEnabled && (
+            <button
+              onClick={onFlipCamera}
+              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-brand text-black flex items-center justify-center shadow-md ring-1 ring-black"
+              title="Flip camera"
+              aria-label="Flip camera"
+            >
+              <FlipHorizontal className="w-3 h-3" />
+            </button>
+          )}
+        </div>
+
+        {/* 3. Chat */}
+        <button
+          onClick={onToggleChat}
+          className={`relative min-w-11 min-h-11 w-11 h-11 xs:w-12 xs:h-12 rounded-2xl flex items-center justify-center transition-all flex-shrink-0 shadow-md ${
+            isChatOpen
+              ? "bg-brand text-black"
+              : "bg-[#1a1a1a] text-gray-200 border border-[#2a2a2a] active:bg-[#252525]"
+          }`}
+          title="Chat"
+          aria-label={isChatOpen ? "Close chat" : unreadCount > 0 ? `Chat, ${unreadCount} unread` : "Open chat"}
+        >
+          <MessageSquare className="w-5 h-5" />
+          {!isChatOpen && unreadCount > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center animate-pulse">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
+          )}
+        </button>
+
+        {/* 4. Reactions & Hand */}
+        <button
+          onClick={() => setShowReactions((prev) => !prev)}
+          className={`relative min-w-11 min-h-11 w-11 h-11 xs:w-12 xs:h-12 rounded-2xl flex items-center justify-center transition-colors flex-shrink-0 shadow-md ${
+            showReactions
+              ? "bg-[#252525] border-brand/50 text-white"
+              : "bg-[#1a1a1a] text-gray-200 border border-[#2a2a2a] active:bg-[#252525]"
+          }`}
+          title="Reactions & Hand Raise"
+          aria-label="Send reaction or raise hand"
+        >
+          <Smile className="w-5 h-5 text-amber-300" />
+          {isHandRaised && (
+            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-black text-[9px] font-bold flex items-center justify-center">
+              ✋
+            </span>
+          )}
+        </button>
+
+        {/* 5. More Options ("...") */}
+        <button
+          onClick={() => setShowMobileMore(true)}
+          className="relative min-w-11 min-h-11 w-11 h-11 xs:w-12 xs:h-12 rounded-2xl bg-[#1a1a1a] text-gray-200 border border-[#2a2a2a] flex items-center justify-center transition-colors flex-shrink-0 shadow-md active:bg-[#252525]"
+          title="More room options"
+          aria-label="More room options"
+        >
+          <MoreHorizontal className="w-5 h-5" />
+          {(krispState === "on" || isHost) && (
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-brand ring-1 ring-black" />
+          )}
+        </button>
+
+        {/* 6. Leave Room */}
+        <button
+          onClick={onLeaveRoom}
+          className="min-w-11 min-h-11 w-11 h-11 xs:w-12 xs:h-12 rounded-2xl bg-rose-600/25 hover:bg-rose-600 border border-rose-600/40 text-rose-300 hover:text-white flex items-center justify-center transition-all shadow-md flex-shrink-0 active:scale-95"
+          title="Leave room"
+          aria-label="Leave room"
+        >
+          <PhoneOff className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* Mobile "More Options" Sheet */}
+      {showMobileMore && (
+        <div
+          className="fixed inset-0 z-50 sm:hidden bg-black/75 backdrop-blur-sm flex items-end animate-in fade-in duration-150"
+          role="dialog"
+          aria-modal="true"
+          aria-label="More room options"
+        >
+          <button
+            className="absolute inset-0 w-full h-full cursor-default"
+            aria-label="Close options"
+            onClick={() => setShowMobileMore(false)}
+          />
+          <section className="relative z-10 w-full max-h-[85dvh] rounded-t-3xl border border-[#292929] border-b-0 bg-[#0e0e0e] flex flex-col overflow-hidden pb-[calc(1.5rem+env(safe-area-inset-bottom))] shadow-2xl">
+            {/* Header */}
+            <div className="h-14 px-4 flex items-center justify-between border-b border-[#222] flex-shrink-0 bg-[#121212]">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-1 rounded-full bg-zinc-600 mx-auto absolute top-2 left-1/2 -translate-x-1/2" />
+                <Settings2 className="w-4 h-4 text-brand" />
+                <h2 className="text-sm font-bold text-white">Room Actions & Audio</h2>
+              </div>
+              <button
+                onClick={() => setShowMobileMore(false)}
+                className="min-w-10 min-h-10 grid place-items-center rounded-xl text-gray-400 hover:text-white hover:bg-[#1a1a1a]"
+                aria-label="Close menu"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Scrollable Content */}
+            <div className="p-4 space-y-4 overflow-y-auto min-h-0 text-xs">
+              {/* Audio & Noise Reduction Section */}
+              <div className="space-y-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  Audio & Noise Filtering
+                </p>
+
+                {/* Krisp AI Tile */}
+                <div className="p-3.5 rounded-2xl bg-black border border-[#262626] flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-brand/10 text-brand flex items-center justify-center flex-shrink-0 border border-brand/20">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <p className="font-semibold text-white text-xs">Krisp AI Noise Filter</p>
+                        <span className="text-[9px] font-bold uppercase px-1 py-0.5 rounded bg-brand/10 text-brand border border-brand/20">
+                          Cloud
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-gray-400 truncate">
+                        {krispState === "on"
+                          ? "Eliminating background chatter"
+                          : krispState === "loading"
+                          ? "Downloading neural model..."
+                          : krispState === "unsupported"
+                          ? "Unsupported on this browser"
+                          : "Voice isolation & deep noise removal"}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={onToggleKrisp}
+                    disabled={krispState === "loading" || krispState === "unsupported"}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all min-h-[38px] min-w-[58px] flex items-center justify-center ${
+                      krispState === "unsupported"
+                        ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+                        : krispState === "loading"
+                        ? "bg-amber-500/20 text-amber-300 border border-amber-500/40"
+                        : krispState === "on"
+                        ? "bg-brand text-black font-extrabold"
+                        : "bg-[#1a1a1a] text-gray-300 border border-[#333]"
+                    }`}
+                  >
+                    {krispState === "loading" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : krispState === "on" ? "ON" : "OFF"}
+                  </button>
+                </div>
+
+                {/* WebRTC Browser Noise Tile */}
+                <div className="p-3.5 rounded-2xl bg-black border border-[#262626] flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-[#1a1a1a] text-gray-300 flex items-center justify-center flex-shrink-0 border border-[#333]">
+                      {isNoiseEnabled ? <Ear className="w-4 h-4 text-brand" /> : <EarOff className="w-4 h-4 text-gray-500" />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-white text-xs">Browser Noise Suppression</p>
+                      <p className="text-[11px] text-gray-400 truncate">Standard WebRTC echo cancellation</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={onToggleNoise}
+                    disabled={!isBrowserProcessingSupported}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all min-h-[38px] min-w-[58px] ${
+                      !isBrowserProcessingSupported
+                        ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+                        : isNoiseEnabled
+                        ? "bg-brand text-black font-extrabold"
+                        : "bg-[#1a1a1a] text-gray-300 border border-[#333]"
+                    }`}
+                  >
+                    {!isBrowserProcessingSupported ? "N/A" : isNoiseEnabled ? "ON" : "OFF"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Screen Share Section */}
+              <div className="space-y-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  Sharing & Media
+                </p>
+                <div className="p-3.5 rounded-2xl bg-black border border-[#262626] flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-9 h-9 rounded-xl bg-[#1a1a1a] text-gray-300 flex items-center justify-center flex-shrink-0 border border-[#333]">
+                      <Monitor className="w-4 h-4 text-brand" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-semibold text-white text-xs">Screen Sharing</p>
+                      <p className="text-[11px] text-gray-400 truncate">
+                        {isScreenSharing ? "Currently sharing" : "Share screen or browser tab"}
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowMobileMore(false);
+                      handleScreenShareClick();
+                    }}
+                    disabled={!isScreenShareAllowed && !isScreenSharing}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all min-h-[38px] ${
+                      isScreenSharing
+                        ? "bg-brand text-black font-extrabold"
+                        : "bg-[#1a1a1a] text-gray-200 border border-[#333]"
+                    }`}
+                  >
+                    {isScreenSharing ? "Stop" : "Share"}
+                  </button>
+                </div>
+              </div>
+
+              {/* Utilities & Controls */}
+              <div className="space-y-2.5">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  Quick Actions
+                </p>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {/* Sound FX */}
+                  <button
+                    onClick={handleToggleSound}
+                    className="p-3 rounded-2xl bg-black border border-[#262626] flex items-center gap-2 text-left hover:bg-[#151515] transition-colors"
+                  >
+                    {soundOn ? <Volume2 className="w-4 h-4 text-brand" /> : <VolumeX className="w-4 h-4 text-gray-500" />}
+                    <div>
+                      <p className="text-xs font-semibold text-white">Sounds</p>
+                      <p className="text-[10px] text-gray-400">{soundOn ? "Enabled" : "Muted"}</p>
+                    </div>
+                  </button>
+
+                  {/* Fullscreen */}
+                  <button
+                    onClick={() => {
+                      setShowMobileMore(false);
+                      onToggleFullscreen();
+                    }}
+                    className="p-3 rounded-2xl bg-black border border-[#262626] flex items-center gap-2 text-left hover:bg-[#151515] transition-colors"
+                  >
+                    {isFullscreen ? <Minimize2 className="w-4 h-4 text-brand" /> : <Maximize2 className="w-4 h-4 text-gray-400" />}
+                    <div>
+                      <p className="text-xs font-semibold text-white">Fullscreen</p>
+                      <p className="text-[10px] text-gray-400">{isFullscreen ? "Active" : "Standard"}</p>
+                    </div>
+                  </button>
+
+                  {/* Invite Friends */}
+                  <button
+                    onClick={() => {
+                      setShowMobileMore(false);
+                      onOpenInvite();
+                    }}
+                    className="p-3 rounded-2xl bg-black border border-[#262626] flex items-center gap-2 text-left hover:bg-[#151515] transition-colors"
+                  >
+                    <Share2 className="w-4 h-4 text-brand" />
+                    <div>
+                      <p className="text-xs font-semibold text-white">Invite</p>
+                      <p className="text-[10px] text-gray-400">Share room link</p>
+                    </div>
+                  </button>
+
+                  {/* Host Controls (if host) */}
+                  {isHost && (
+                    <button
+                      onClick={() => {
+                        setShowMobileMore(false);
+                        onOpenHostControls();
+                      }}
+                      className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-2 text-left hover:bg-amber-500/20 transition-colors"
+                    >
+                      <Crown className="w-4 h-4 text-amber-400" />
+                      <div>
+                        <p className="text-xs font-semibold text-amber-300">Host Menu</p>
+                        <p className="text-[10px] text-amber-400/80">Manage room</p>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      )}
     </footer>
   );
 }

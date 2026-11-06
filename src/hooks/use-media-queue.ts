@@ -8,6 +8,7 @@ interface UseMediaQueueOptions {
   room: Room | null;
   isHost: boolean;
   localParticipantId: string;
+  hostParticipantId?: string;
 }
 
 interface UseMediaQueueReturn {
@@ -23,6 +24,7 @@ interface UseMediaQueueReturn {
   seek: (time: number) => void;
   nextItem: () => void;
   setCurrentTime: (t: number) => void;
+  playItem: (index: number) => void;
 }
 
 function generateId(): string {
@@ -33,6 +35,7 @@ export function useMediaQueue({
   room,
   isHost,
   localParticipantId,
+  hostParticipantId,
 }: UseMediaQueueOptions): UseMediaQueueReturn {
   const [queue, setQueue] = useState<MediaQueueItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -62,16 +65,18 @@ export function useMediaQueue({
   useEffect(() => {
     if (!room) return;
 
-    const handleData = (payload: Uint8Array) => {
+    const handleData = (payload: Uint8Array, sender?: { identity?: string }) => {
       try {
         const text = new TextDecoder().decode(payload);
         const packet = JSON.parse(text) as PlaybackSyncPacket;
         if (packet.type !== "playback_sync") return;
+        if (!hostParticipantId || sender?.identity !== hostParticipantId) return;
 
         switch (packet.action) {
           case "queue_update":
             if (packet.queue !== undefined) setQueue(packet.queue);
             if (packet.currentIndex !== undefined) setCurrentIndex(packet.currentIndex);
+            if (packet.currentTime !== undefined) setCurrentTime(packet.currentTime);
             break;
           case "play":
             setIsPlaying(true);
@@ -102,7 +107,7 @@ export function useMediaQueue({
     return () => {
       room.off(RoomEvent.DataReceived, handleData);
     };
-  }, [room]);
+  }, [room, hostParticipantId]);
 
   // When a new participant joins, host sends current state
   useEffect(() => {
@@ -118,6 +123,7 @@ export function useMediaQueue({
         currentIndex: ci,
         currentTime: ct,
       });
+      sendPacket({ type: "playback_sync", action: ip ? "play" : "pause", currentTime: ct });
     };
 
     room.on(RoomEvent.ParticipantConnected, handleParticipantConnected);
@@ -199,6 +205,16 @@ export function useMediaQueue({
     setCurrentTime(0);
   }, [isHost, sendPacket]);
 
+  const playItem = useCallback((index: number) => {
+    const { queue: currentQueue } = stateRef.current;
+    if (!isHost || index < 0 || index >= currentQueue.length) return;
+    setCurrentIndex(index);
+    setCurrentTime(0);
+    setIsPlaying(true);
+    sendPacket({ type: "playback_sync", action: "queue_update", queue: currentQueue, currentIndex: index, currentTime: 0 });
+    sendPacket({ type: "playback_sync", action: "play", currentTime: 0 });
+  }, [isHost, sendPacket]);
+
   return {
     queue,
     currentIndex,
@@ -212,5 +228,6 @@ export function useMediaQueue({
     seek,
     nextItem,
     setCurrentTime,
+    playItem,
   };
 }

@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+.screen-share-fullscreen:fullscreen {
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+}
+
+@media (orientation: landscape) and (max-width: 900px) {
+  .screen-share-fullscreen:fullscreen {
+    width: 100vw;
+    height: 100dvh;
+  }
+}
+
 :root {
     --background: 222 47% 4%;
     --foreground: 210 40% 98%;
@@ -9,19 +32,19 @@
     --card-foreground: 210 40% 98%;
     --popover: 222 47% 7%;
     --popover-foreground: 210 40% 98%;
-    --primary: 243 75% 59%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 217 33% 14%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217 33% 14%;
-    --muted-foreground: 215 20% 65%;
-    --accent: 243 75% 59%;
-    --accent-foreground: 210 40% 98%;
+    --primary: 81 96% 58%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 0 0% 11%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 0 0% 11%;
+    --muted-foreground: 0 0% 65%;
+    --accent: 81 96% 58%;
+    --accent-foreground: 0 0% 0%;
     --destructive: 0 84% 60%;
     --destructive-foreground: 210 40% 98%;
     --border: 217 33% 16%;
     --input: 217 33% 16%;
-    --ring: 243 75% 59%;
+    --ring: 81 96% 58%;
     --radius: 0.75rem;
 }
 

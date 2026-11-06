@@ -33,23 +33,25 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="flex-1 flex flex-col bg-black text-white">
+    <div className="flex-1 flex flex-col overflow-x-clip bg-black text-white">
       {/* Navigation Bar */}
       <header className="border-b border-[#1a1a1a] bg-black/70 backdrop-blur-md sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 min-w-0">
           <BrandLogo size="md" />
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
             <button
               onClick={() => setIsJoinCodeOpen(true)}
-              className="px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-gray-300 hover:text-white hover:bg-[#111111] border border-transparent hover:border-[#2a2a2a] transition-all"
+              className="px-2.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold text-gray-300 hover:text-white hover:bg-[#111111] border border-transparent hover:border-[#2a2a2a] transition-all"
             >
-              Enter Code
+              <span className="sm:hidden">Join</span>
+              <span className="hidden sm:inline">Enter Code</span>
             </button>
             <button
               onClick={() => setIsCreateOpen(true)}
-              className="px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-brand hover:bg-[#ceff44] text-black shadow-md shadow-brand/20 transition-all"
+              className="px-2.5 sm:px-4 py-2 rounded-xl text-xs sm:text-sm font-bold bg-brand hover:bg-[#ceff44] text-black shadow-md shadow-brand/20 transition-all"
             >
-              Create Room
+              <span className="sm:hidden">Create</span>
+              <span className="hidden sm:inline">Create Room</span>
             </button>
           </div>
         </div>
@@ -62,7 +64,7 @@ export default function LandingPage() {
         <div className="absolute top-1/3 right-1/4 w-[400px] h-[300px] bg-brand/5 blur-[140px] pointer-events-none rounded-full" />
 
         <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center relative z-10">
-          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand/10 border border-brand/20 text-brand text-xs font-semibold mb-6">
+          <div className="inline-flex max-w-full flex-wrap justify-center items-center gap-2 px-3.5 py-1.5 rounded-full bg-brand/10 border border-brand/20 text-brand text-xs font-semibold mb-6">
             <Sparkles className="w-3.5 h-3.5" />
             <span>100% Free &amp; Open Source — No Accounts Needed</span>
           </div>

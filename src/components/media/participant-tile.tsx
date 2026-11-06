@@ -3,18 +3,20 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Participant, Track, ConnectionQuality } from "livekit-client";
 import { MicOff, Hand, Monitor, Wifi } from "lucide-react";
-import { mapLiveKitQuality, getConnectionStatusColor } from "@/lib/network-stats";
+import { mapLiveKitQuality, getConnectionStatusColor, NETWORK_RTT_THRESHOLDS_MS } from "@/lib/network-stats";
 
 interface ParticipantTileProps {
   participant: Participant;
   isLocal: boolean;
   isHandRaised?: boolean;
+  rttMs?: number | null;
 }
 
 export function ParticipantTile({
   participant,
   isLocal,
   isHandRaised = false,
+  rttMs = null,
 }: ParticipantTileProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -44,7 +46,7 @@ export function ParticipantTile({
         track.attach(videoRef.current);
         setIsVideoEnabled(true);
       }
-      if (track.kind === Track.Kind.Audio && audioRef.current && !isLocal) {
+      if (track.source === Track.Source.Microphone && audioRef.current && !isLocal) {
         track.attach(audioRef.current);
         // Explicitly attempt playback after attach — required on some Android browsers
         audioRef.current.play().catch(() => {
@@ -55,22 +57,24 @@ export function ParticipantTile({
 
     const handleTrackUnsubscribed = (track: any) => {
       if (track.kind === Track.Kind.Video) {
-        track.detach();
+        if (videoRef.current) track.detach(videoRef.current);
+        else track.detach();
         setIsVideoEnabled(false);
       }
-      if (track.kind === Track.Kind.Audio && !isLocal) {
-        track.detach();
+      if (track.source === Track.Source.Microphone && !isLocal) {
+        if (audioRef.current) track.detach(audioRef.current);
+        else track.detach();
       }
     };
 
     const handleTrackMuted = (pub: any) => {
       if (pub.kind === Track.Kind.Video) setIsVideoEnabled(false);
-      if (pub.kind === Track.Kind.Audio) setIsAudioMuted(true);
+      if (pub.source === Track.Source.Microphone) setIsAudioMuted(true);
     };
 
     const handleTrackUnmuted = (pub: any) => {
       if (pub.kind === Track.Kind.Video) setIsVideoEnabled(true);
-      if (pub.kind === Track.Kind.Audio) setIsAudioMuted(false);
+      if (pub.source === Track.Source.Microphone) setIsAudioMuted(false);
     };
 
     const handleIsSpeakingChanged = (speaking: boolean) => {
@@ -83,13 +87,13 @@ export function ParticipantTile({
 
     // Attach existing video tracks if already published
     const cameraPub = participant.getTrackPublication(Track.Source.Camera);
+    const micPub = !isLocal ? participant.getTrackPublication(Track.Source.Microphone) : undefined;
     if (cameraPub && cameraPub.track && videoRef.current) {
       cameraPub.track.attach(videoRef.current);
       setIsVideoEnabled(cameraPub.isMuted ? false : true);
     }
 
     if (!isLocal) {
-      const micPub = participant.getTrackPublication(Track.Source.Microphone);
       if (micPub && micPub.track && audioRef.current) {
         micPub.track.attach(audioRef.current);
         audioRef.current.play().catch(() => {
@@ -116,10 +120,18 @@ export function ParticipantTile({
       participant.off("trackUnmuted", handleTrackUnmuted);
       participant.off("isSpeakingChanged", handleIsSpeakingChanged);
       participant.off("connectionQualityChanged", handleConnectionQualityChanged);
+      if (videoRef.current) {
+        participant.getTrackPublication(Track.Source.Camera)?.track?.detach(videoRef.current);
+      }
+      if (!isLocal && audioRef.current) {
+        participant.getTrackPublication(Track.Source.Microphone)?.track?.detach(audioRef.current);
+      }
     };
   }, [participant, isLocal]);
 
-  const qualityStatus = mapLiveKitQuality(connectionQuality);
+  const qualityStatus = typeof rttMs === "number"
+    ? rttMs < NETWORK_RTT_THRESHOLDS_MS.goodBelow ? "good" : rttMs <= NETWORK_RTT_THRESHOLDS_MS.moderateThrough ? "moderate" : "poor"
+    : mapLiveKitQuality(connectionQuality);
   const colorStyle = getConnectionStatusColor(qualityStatus);
 
   return (
@@ -187,15 +199,20 @@ export function ParticipantTile({
       >
         <div
           className={`flex items-center gap-1 px-1.5 py-0.5 rounded-full border text-[10px] font-semibold backdrop-blur-md cursor-pointer ${colorStyle.bg} ${colorStyle.text}`}
+          role="img"
+          aria-label={`${qualityStatus} connection, ${rttMs === null ? "latency unavailable" : `${rttMs} milliseconds to the LiveKit media server`}`}
+          title={`${qualityStatus}: ${rttMs === null ? "RTT unavailable" : `${rttMs} ms to LiveKit SFU (self-reported WebRTC RTT)`}`}
         >
           <div className={`w-1.5 h-1.5 rounded-full ${colorStyle.dot}`} />
           <Wifi className="w-3 h-3" />
+          <span>{rttMs === null ? "-- ms" : `${rttMs} ms`}</span>
         </div>
 
         {showNetworkInfo && (
           <div className="absolute top-6 right-0 w-36 p-2 rounded-xl bg-black border border-[#2a2a2a] shadow-xl text-[10px] text-gray-300 z-30">
             <p className="font-semibold text-white capitalize">{qualityStatus}</p>
-            <p className="text-gray-400 mt-0.5">LiveKit WebRTC SFU</p>
+            <p className="text-gray-400 mt-0.5">RTT to LiveKit SFU</p>
+            <p className="text-gray-500 mt-0.5">Self-reported WebRTC measurement; not a peer-to-peer ping.</p>
           </div>
         )}
       </div>

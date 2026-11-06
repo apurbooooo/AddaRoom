@@ -122,9 +122,16 @@ export type LiveKitDataPacket =
   | HandRaisePacket
   | HostCommandPacket;
 
+export interface NetworkTelemetryPacket {
+  type: "network_telemetry";
+  version: 1;
+  rttMs: number | null;
+  sentAt: number;
+}
+
 export type ScreenShareQualityMode = "auto" | "high" | "high60" | "balanced" | "saver";
 
-export type ConnectionQualityStatus = "excellent" | "good" | "moderate" | "poor" | "reconnecting";
+export type ConnectionQualityStatus = "excellent" | "good" | "moderate" | "poor" | "lost" | "unknown";
 
 export interface OverlayChatConfig {
   enabled: boolean;

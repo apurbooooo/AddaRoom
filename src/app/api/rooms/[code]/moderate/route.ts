@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { roomStore } from "@/server/db";
 import { moderateRoomSchema } from "@/lib/validations";
-import { kickLiveKitParticipant } from "@/server/livekit";
+import { kickLiveKitParticipant, notifyLiveKitParticipantKicked, setLiveKitParticipantHostPermissions } from "@/server/livekit";
 
 export async function POST(
   req: Request,
@@ -26,7 +26,7 @@ export async function POST(
       return NextResponse.json({ error: "Room not found" }, { status: 404 });
     }
 
-    const { participantId, sessionSecret, action, targetParticipantId, canScreenShare } = parsed.data;
+    const { participantId, sessionSecret, action, targetParticipantId, canScreenShare, muted } = parsed.data;
     const host = await roomStore.verifyParticipantSession(room.id, participantId, sessionSecret);
     if (!host || host.role !== "host") {
       return NextResponse.json(
@@ -44,9 +44,23 @@ export async function POST(
     }
 
     if (action === "kick") {
-      await roomStore.kickParticipant(targetParticipantId);
+      // Revoke the online LiveKit token before the database session. If the
+      // participant is offline, the database session check still blocks all
+      // application re-entry and token renewal.
+      await notifyLiveKitParticipantKicked(room.roomCode, targetParticipantId);
       await kickLiveKitParticipant(room.roomCode, targetParticipantId);
+      await roomStore.kickParticipant(targetParticipantId);
       return NextResponse.json({ success: true, message: "Participant removed" });
+    }
+
+    if (action === "mute") {
+      const nextMuted = muted!;
+      await setLiveKitParticipantHostPermissions(room.roomCode, targetParticipantId, {
+        canScreenShare: target.canScreenShare,
+        isMutedByHost: nextMuted,
+      });
+      const updated = await roomStore.updateParticipantPermissions(targetParticipantId, { isMutedByHost: nextMuted });
+      return NextResponse.json({ success: true, participant: updated, muted: nextMuted });
     }
 
     if (action === "transfer_host") {
@@ -55,9 +69,12 @@ export async function POST(
     }
 
     if (action === "toggle_screen_share") {
-      const updated = await roomStore.updateParticipantPermissions(targetParticipantId, {
-        canScreenShare: canScreenShare ?? true,
+      const nextAllowed = canScreenShare ?? true;
+      await setLiveKitParticipantHostPermissions(room.roomCode, targetParticipantId, {
+        canScreenShare: nextAllowed,
+        isMutedByHost: target.isMutedByHost,
       });
+      const updated = await roomStore.updateParticipantPermissions(targetParticipantId, { canScreenShare: nextAllowed });
       return NextResponse.json({ success: true, participant: updated });
     }
 

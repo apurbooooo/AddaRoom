@@ -1,13 +1,16 @@
 "use client";
 
 import React from "react";
-import { Mic, MicOff, Crown, Volume2 } from "lucide-react";
+import { Mic, MicOff, Crown, Volume2, Wifi } from "lucide-react";
 import { PublicParticipant } from "@/types";
+import { ParticipantNetworkTelemetry } from "@/hooks/use-network-telemetry";
+import { getConnectionStatusColor, NETWORK_RTT_THRESHOLDS_MS } from "@/lib/network-stats";
 
 interface RoomSidebarLeftProps {
   participants: PublicParticipant[];
   localParticipantId: string;
   speakingParticipantIds: string[];
+  networkMetrics: Record<string, ParticipantNetworkTelemetry>;
   className?: string;
 }
 
@@ -15,6 +18,7 @@ export function RoomSidebarLeft({
   participants,
   localParticipantId,
   speakingParticipantIds,
+  networkMetrics,
   className = "",
 }: RoomSidebarLeftProps) {
   const isSpeaking = (id: string) => speakingParticipantIds.includes(id);
@@ -36,6 +40,9 @@ export function RoomSidebarLeft({
           participants.map((p) => {
             const isLocal = p.id === localParticipantId;
             const speaking = isSpeaking(p.id);
+            const rttMs = networkMetrics[p.id]?.rttMs ?? null;
+            const networkQuality = networkMetrics[p.id]?.quality ?? "unknown";
+            const networkColor = rttMs === null ? getConnectionStatusColor(networkQuality).text : rttMs < NETWORK_RTT_THRESHOLDS_MS.goodBelow ? "text-brand" : rttMs <= NETWORK_RTT_THRESHOLDS_MS.moderateThrough ? "text-amber-400" : "text-rose-400";
             return (
               <div
                 key={p.id}
@@ -62,7 +69,7 @@ export function RoomSidebarLeft({
                 {/* Name + badges */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs font-semibold text-white truncate">
+                  <span className="text-xs font-semibold text-white truncate">
                       {p.displayName}
                       {isLocal && (
                         <span className="ml-1 text-gray-500 font-normal">(you)</span>
@@ -75,6 +82,10 @@ export function RoomSidebarLeft({
                     )}
                   </div>
                 </div>
+
+                <span className={`flex items-center gap-1 text-[10px] font-medium ${networkColor}`} title={`${rttMs === null ? "RTT unavailable" : `${rttMs} ms`} to LiveKit SFU; self-reported WebRTC measurement`}>
+                  <Wifi className="w-3 h-3" />{rttMs === null ? "-- ms" : `${rttMs} ms`}
+                </span>
 
                 {/* Mic status */}
                 <div className="flex-shrink-0">

@@ -44,7 +44,9 @@ export async function POST(
       participantName: participant.displayName,
       isHost: participant.role === "host",
       avatar: participant.avatar,
-      canPublish: true,
+      canPublish: !participant.isMutedByHost,
+      canScreenShare: participant.canScreenShare,
+      isMutedByHost: participant.isMutedByHost,
     });
 
     const livekitUrl = getClientLiveKitUrl();
@@ -74,4 +76,3 @@ export async function POST(
     return NextResponse.json({ error: "Failed to resume session" }, { status: 500 });
   }
 }
-

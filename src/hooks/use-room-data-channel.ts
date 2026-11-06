@@ -16,6 +16,62 @@ export interface ActiveReactionItem extends ReactionPacket {
   id: string;
 }
 
+/**
+ * Validates whether an incoming moderation data-channel packet is authorized.
+ *
+ * A packet is authorized ONLY if:
+ * 1) Server-Originated:
+ *    - `participant` is absent (null/undefined)
+ *    - `participantIdentity` is absent (null/undefined or empty string "")
+ *    - `topic` is exactly "server-room-control"
+ * OR
+ * 2) Host-Participant-Originated:
+ *    - `authorizedHostId` is defined and non-empty
+ *    - `participant` is present and has `identity` matching `authorizedHostId`
+ *    - If `participantIdentity` is present, it must be consistent and match `participant.identity`
+ *
+ * Any packet with mismatched identities, an imposter sender, an unauthorized participant
+ * attempting to use "server-room-control", or participantIdentity present while pretending
+ * to be from the server is rejected.
+ */
+export function isModerationPacketAuthorized(
+  participant: { identity?: string } | undefined | null,
+  topic: string | undefined,
+  authorizedHostId: string | undefined,
+  participantIdentity?: string,
+): boolean {
+  const effectiveParticipantIdentity = participantIdentity?.trim() || undefined;
+  const participantObjIdentity = participant?.identity?.trim() || undefined;
+
+  // 1) Server-Originated Check:
+  // Must have NO participant object, NO participant identity, and topic must be "server-room-control"
+  const isAbsentParticipant = !participant;
+  const isAbsentIdentity = !effectiveParticipantIdentity;
+  const isServerTopic = topic === "server-room-control";
+
+  if (isAbsentParticipant && isAbsentIdentity && isServerTopic) {
+    return true;
+  }
+
+  // If effectiveParticipantIdentity is present, it cannot be treated as server-originated.
+  // 2) Host-Participant-Originated Check:
+  const hostId = authorizedHostId?.trim();
+  if (!hostId) {
+    return false;
+  }
+
+  if (!participantObjIdentity) {
+    return false;
+  }
+
+  // Reject inconsistent sender information (mismatched participant and participantIdentity)
+  if (effectiveParticipantIdentity && participantObjIdentity !== effectiveParticipantIdentity) {
+    return false;
+  }
+
+  return participantObjIdentity === hostId;
+}
+
 export function useRoomDataChannel(
   room: Room | undefined,
   currentParticipantId: string,
@@ -36,7 +92,14 @@ export function useRoomDataChannel(
   useEffect(() => {
     if (!room) return;
 
-    const handleDataReceived = (payload: Uint8Array, participant: any) => {
+    const handleDataReceived = (
+      payload: Uint8Array,
+      participant?: { identity?: string } | null,
+      _kind?: unknown,
+      topic?: string,
+      _encryptionType?: unknown,
+      participantIdentity?: string,
+    ) => {
       try {
         const textDecoder = new TextDecoder();
         const jsonStr = textDecoder.decode(payload);
@@ -99,10 +162,13 @@ export function useRoomDataChannel(
             break;
           }
           case "host_command": {
-            // Data-channel payloads are user-controlled. Accept moderation
-            // notifications only when the sender identity matches the host
-            // reported by the server-backed room roster.
-            if (!authorizedHostId || participant?.identity !== authorizedHostId) break;
+            if (!isModerationPacketAuthorized(participant, topic, authorizedHostId, participantIdentity)) {
+              console.warn(
+                "[DataChannel] Rejected unauthorized host_command from:",
+                participant?.identity || participantIdentity || "unknown",
+              );
+              break;
+            }
             if (data.action === "kick" && data.targetParticipantId === currentParticipantId) {
               setKicked(true);
             }

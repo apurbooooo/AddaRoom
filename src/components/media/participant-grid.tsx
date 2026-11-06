@@ -5,6 +5,7 @@ import { Participant } from "livekit-client";
 import { ParticipantTile } from "./participant-tile";
 import { ScreenShareStage } from "./screen-share-stage";
 import { ChatMessagePacket, ScreenShareQualityMode } from "@/types";
+import { ParticipantNetworkTelemetry } from "@/hooks/use-network-telemetry";
 
 interface ParticipantGridProps {
   localParticipant: Participant | undefined;
@@ -12,6 +13,10 @@ interface ParticipantGridProps {
   raisedHands: Set<string>;
   messages: ChatMessagePacket[];
   currentParticipantId: string;
+  onSendMessage: (text: string) => void;
+  unreadCount: number;
+  onOpenChat: () => void;
+  networkMetrics: Record<string, ParticipantNetworkTelemetry>;
   onStopScreenShare?: () => void;
   qualityMode: ScreenShareQualityMode;
   onChangeQualityMode?: (mode: ScreenShareQualityMode) => void;
@@ -23,6 +28,10 @@ export function ParticipantGrid({
   raisedHands,
   messages,
   currentParticipantId,
+  onSendMessage,
+  unreadCount,
+  onOpenChat,
+  networkMetrics,
   onStopScreenShare,
   qualityMode,
   onChangeQualityMode,
@@ -46,6 +55,9 @@ export function ParticipantGrid({
             isLocal={screenSharer === localParticipant}
             messages={messages}
             currentParticipantId={currentParticipantId}
+            onSendMessage={onSendMessage}
+            unreadCount={unreadCount}
+            onOpenChat={onOpenChat}
             onStopSharing={onStopScreenShare}
             qualityMode={qualityMode}
             onChangeQualityMode={onChangeQualityMode}
@@ -63,6 +75,7 @@ export function ParticipantGrid({
                 participant={p}
                 isLocal={p === localParticipant}
                 isHandRaised={raisedHands.has(p.identity)}
+                rttMs={networkMetrics[p.identity]?.rttMs}
               />
             </div>
           ))}
@@ -92,6 +105,7 @@ export function ParticipantGrid({
               participant={p}
               isLocal={p === localParticipant}
               isHandRaised={raisedHands.has(p.identity)}
+              rttMs={networkMetrics[p.identity]?.rttMs}
             />
           </div>
         ))}

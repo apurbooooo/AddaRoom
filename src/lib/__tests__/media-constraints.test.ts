@@ -19,6 +19,6 @@ describe("screen share capture presets", () => {
   });
 
   it("leaves capture quality to the browser in Auto mode", () => {
-    expect(getScreenShareOptions("auto")).toEqual({ audio: true });
+    expect(getScreenShareOptions("auto")).toEqual({ audio: true, systemAudio: "include" });
   });
 });

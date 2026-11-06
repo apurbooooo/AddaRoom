@@ -17,6 +17,7 @@ export default function RoomPage({
   const [session, setSession] = useState<ClientSession | null>(null);
   const [livekitToken, setLivekitToken] = useState<string | null>(null);
   const [livekitUrl, setLivekitUrl] = useState<string | null>(null);
+  const [initialMedia, setInitialMedia] = useState<{ cameraEnabled: boolean; micEnabled: boolean } | undefined>();
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -46,6 +47,11 @@ export default function RoomPage({
         }
 
         const data = await res.json();
+        const mediaPrefs = sessionStorage.getItem(`addaroom:join-media:${code}`);
+        if (mediaPrefs) {
+          try { setInitialMedia(JSON.parse(mediaPrefs)); } catch { setInitialMedia(undefined); }
+          sessionStorage.removeItem(`addaroom:join-media:${code}`);
+        }
         setSession(data.session);
         setLivekitToken(data.livekitToken);
         setLivekitUrl(data.livekitUrl);
@@ -77,6 +83,7 @@ export default function RoomPage({
       initialSession={session}
       livekitToken={livekitToken}
       livekitUrl={livekitUrl}
+      initialMedia={initialMedia}
     />
   );
 }

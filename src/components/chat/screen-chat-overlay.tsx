@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React from "react";
 import { ChatMessagePacket, OverlayChatConfig } from "@/types";
 
 interface ScreenChatOverlayProps {
@@ -21,18 +21,12 @@ export function ScreenChatOverlay({
   const now = Date.now();
   const maxAgeMs = config.fadeOutSeconds * 1000;
 
-  // Get active messages within the fade-out window
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const visibleMessages = useMemo(() => {
-    return messages
-      .filter((m) => {
-        if (config.hideOwnMessages && m.senderId === currentParticipantId) {
-          return false;
-        }
-        return now - m.timestamp < maxAgeMs;
-      })
-      .slice(-6); // Keep up to 6 recent messages in stack
-  }, [messages, config.hideOwnMessages, currentParticipantId, now, maxAgeMs]);
+  const visibleMessages = messages
+    .filter((m) => {
+      if (config.hideOwnMessages && m.senderId === currentParticipantId) return false;
+      return now - m.timestamp < maxAgeMs;
+    })
+    .slice(-6);
 
   if (visibleMessages.length === 0) return null;
 
@@ -57,17 +51,17 @@ export function ScreenChatOverlay({
               className="flex items-start gap-2 animate-in slide-in-from-bottom-2 fade-in duration-200"
               style={{ opacity: config.opacity }}
             >
-              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-slate-900/90 border border-white/20 flex items-center justify-center text-xs shadow-md">
+              <div className="flex-shrink-0 w-7 h-7 rounded-full bg-black/90 border border-white/20 flex items-center justify-center text-xs shadow-md">
                 {msg.avatar || "💬"}
               </div>
               <div
                 className={`flex flex-col px-3 py-1.5 rounded-2xl backdrop-blur-md shadow-lg border text-xs ${
                   isMe
-                    ? "bg-indigo-900/80 border-indigo-400/40 text-indigo-50"
-                    : "bg-slate-900/85 border-slate-700/60 text-slate-100"
+                    ? "bg-brand/15 border-brand/30 text-white"
+                    : "bg-black/85 border-white/15 text-gray-100"
                 }`}
               >
-                <span className="font-bold text-[10px] tracking-wide text-indigo-300">
+                <span className="font-bold text-[10px] tracking-wide text-brand">
                   {msg.senderName}
                 </span>
                 <span className="text-xs break-words leading-relaxed select-none">

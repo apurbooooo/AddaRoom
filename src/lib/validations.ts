@@ -29,6 +29,10 @@ export const moderateRoomSchema = sessionAuthSchema.extend({
   action: z.enum(["kick", "mute", "transfer_host", "toggle_screen_share"]),
   targetParticipantId: z.string().min(1),
   canScreenShare: z.boolean().optional(),
+  muted: z.boolean().optional(),
+}).refine((data) => data.action !== "mute" || typeof data.muted === "boolean", {
+  message: "Mute action requires an explicit muted value",
+  path: ["muted"],
 });
 
 export const setRoomPasswordSchema = sessionAuthSchema.extend({

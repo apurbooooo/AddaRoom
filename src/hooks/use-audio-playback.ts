@@ -31,12 +31,16 @@ export function useAudioPlayback(room: Room | undefined) {
    * Must be called from a user gesture (click/tap) handler.
    * Unlocks audio playback on iOS Safari.
    */
-  const startAudio = useCallback(async () => {
-    if (!room) return;
+  const startAudio = useCallback(async (): Promise<boolean> => {
+    if (!room) return false;
     try {
       await room.startAudio();
+      setCanPlayAudio(room.canPlaybackAudio);
+      return room.canPlaybackAudio;
     } catch (err) {
       console.warn("[AudioPlayback] Failed to start audio:", err);
+      setCanPlayAudio(false);
+      return false;
     }
   }, [room]);
 

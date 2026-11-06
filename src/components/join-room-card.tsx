@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Users, Lock, LogIn, Loader2, AlertCircle, KeyRound } from "lucide-react";
 import { PublicRoomInfo } from "@/types";
 import { saveRoomSession } from "@/lib/session-storage";
+import { PreJoinPreview } from "@/components/pre-join-preview";
 
 interface JoinRoomCardProps {
   room: PublicRoomInfo;
@@ -17,6 +18,7 @@ export function JoinRoomCard({ room }: JoinRoomCardProps) {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   const isFull = room.participantCount >= room.capacity;
   const isLocked = room.status === "locked";
@@ -24,13 +26,18 @@ export function JoinRoomCard({ room }: JoinRoomCardProps) {
 
   const avatarOptions = ["👋", "😎", "🦊", "⚡", "🎧", "🎮", "☕", "🐱", "✨", "🍕"];
 
-  const handleJoin = async (e: React.FormEvent) => {
+  const handleJoin = (e: React.FormEvent) => {
     e.preventDefault();
     if (!displayName.trim()) {
       setError("Please enter your display name");
       return;
     }
+    setError(null);
+    setShowPreview(true);
+  };
 
+  const completeJoin = async (cameraEnabled: boolean, micEnabled: boolean) => {
+    setShowPreview(false);
     setLoading(true);
     setError(null);
 
@@ -57,6 +64,7 @@ export function JoinRoomCard({ room }: JoinRoomCardProps) {
       }
 
       saveRoomSession(data.session);
+      sessionStorage.setItem(`addaroom:join-media:${room.roomCode}`, JSON.stringify({ cameraEnabled, micEnabled }));
       router.push(`/room/${room.roomCode}`);
     } catch (err: any) {
       setError(err.message || "Failed to join room");
@@ -66,6 +74,7 @@ export function JoinRoomCard({ room }: JoinRoomCardProps) {
 
   return (
     <div className="w-full max-w-md rounded-2xl bg-[#111111] border border-[#2a2a2a] p-6 shadow-2xl text-white">
+      {showPreview && <PreJoinPreview displayName={displayName.trim()} roomTitle={room.title} onJoin={completeJoin} onCancel={() => setShowPreview(false)} />}
       {/* Room Overview Banner */}
       <div className="p-4 rounded-xl bg-black border border-[#2a2a2a] mb-5">
         <span className="text-[11px] font-bold uppercase tracking-wider text-brand">

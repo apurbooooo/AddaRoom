@@ -9,13 +9,16 @@ export function isScreenShareSupported(): boolean {
 }
 
 export function getScreenShareOptions(mode: ScreenShareQualityMode): ScreenShareCaptureOptions {
-  // Base configuration
-  const audio = true; // Attempt system/tab audio if user checks the box
+  // Ask the browser picker to offer system/tab audio. The browser still decides
+  // whether the selected source can provide an audio track.
+  const audio = true;
+  const systemAudio = "include" as const;
 
   switch (mode) {
     case "high":
       return {
         audio,
+        systemAudio,
         resolution: {
           width: 1920,
           height: 1080,
@@ -25,6 +28,7 @@ export function getScreenShareOptions(mode: ScreenShareQualityMode): ScreenShare
     case "high60":
       return {
         audio,
+        systemAudio,
         resolution: {
           width: 1920,
           height: 1080,
@@ -34,6 +38,7 @@ export function getScreenShareOptions(mode: ScreenShareQualityMode): ScreenShare
     case "balanced":
       return {
         audio,
+        systemAudio,
         resolution: {
           width: 1280,
           height: 720,
@@ -43,6 +48,7 @@ export function getScreenShareOptions(mode: ScreenShareQualityMode): ScreenShare
     case "saver":
       return {
         audio,
+        systemAudio,
         resolution: {
           width: 854,
           height: 480,
@@ -52,7 +58,7 @@ export function getScreenShareOptions(mode: ScreenShareQualityMode): ScreenShare
     case "auto":
     default:
       // Leave capture selection to the browser and the user's display picker.
-      return { audio };
+      return { audio, systemAudio };
   }
 }
 

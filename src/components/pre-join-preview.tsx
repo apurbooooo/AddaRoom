@@ -10,9 +10,13 @@ interface PreJoinPreviewProps {
   onCancel?: () => void;
 }
 
+type MediaRequestResult = { value: MediaStream | null; error?: unknown };
+
 export function PreJoinPreview({ displayName, roomTitle, onJoin, onCancel }: PreJoinPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const streamGenerationRef = useRef(0);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animFrameRef = useRef<number | null>(null);
 
@@ -27,6 +31,7 @@ export function PreJoinPreview({ displayName, roomTitle, onJoin, onCancel }: Pre
   const [selectedMic, setSelectedMic] = useState<string>("");
 
   const stopStream = () => {
+    streamGenerationRef.current += 1;
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
@@ -35,25 +40,49 @@ export function PreJoinPreview({ displayName, roomTitle, onJoin, onCancel }: Pre
       cancelAnimationFrame(animFrameRef.current);
       animFrameRef.current = null;
     }
+    if (audioContextRef.current) {
+      audioContextRef.current.close().catch(() => {});
+      audioContextRef.current = null;
+    }
   };
 
   const startStream = async (cam: boolean, mic: boolean, cameraId?: string, micId?: string) => {
     stopStream();
+    const generation = ++streamGenerationRef.current;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: cam ? (cameraId ? { deviceId: { exact: cameraId } } : { facingMode: "user" }) : false,
-        audio: mic ? (micId ? { deviceId: { exact: micId } } : { noiseSuppression: true, echoCancellation: true }) : false,
-      });
+      const [videoResult, audioResult]: [MediaRequestResult, MediaRequestResult] = await Promise.all([
+        cam ? navigator.mediaDevices.getUserMedia({ video: cameraId ? { deviceId: { exact: cameraId } } : { facingMode: "user" }, audio: false }).then((value): MediaRequestResult => ({ value })).catch((error): MediaRequestResult => ({ value: null, error })) : Promise.resolve({ value: null }),
+        mic ? navigator.mediaDevices.getUserMedia({ video: false, audio: micId ? { deviceId: { exact: micId } } : { noiseSuppression: true, echoCancellation: true, autoGainControl: true } }).then((value): MediaRequestResult => ({ value })).catch((error): MediaRequestResult => ({ value: null, error })) : Promise.resolve({ value: null }),
+      ]);
+      if (generation !== streamGenerationRef.current) {
+        videoResult.value?.getTracks().forEach((track) => track.stop());
+        audioResult.value?.getTracks().forEach((track) => track.stop());
+        return;
+      }
+      const tracks = [
+        ...(videoResult.value?.getVideoTracks() ?? []),
+        ...(audioResult.value?.getAudioTracks() ?? []),
+      ];
+      const stream = new MediaStream(tracks);
       streamRef.current = stream;
 
       if (videoRef.current && cam) {
         videoRef.current.srcObject = stream;
+      } else if (videoRef.current) {
+        videoRef.current.srcObject = null;
       }
+
+      const cameraReady = stream.getVideoTracks().length > 0;
+      const micReady = stream.getAudioTracks().length > 0;
+      setCameraEnabled(cameraReady);
+      setMicEnabled(micReady);
 
       // Mic level meter
       const audioTracks = stream.getAudioTracks();
       if (mic && audioTracks.length > 0) {
         const ctx = new AudioContext();
+        audioContextRef.current = ctx;
+        await ctx.resume().catch(() => {});
         const source = ctx.createMediaStreamSource(stream);
         const analyser = ctx.createAnalyser();
         analyser.fftSize = 256;
@@ -74,23 +103,22 @@ export function PreJoinPreview({ displayName, roomTitle, onJoin, onCancel }: Pre
       const devices = await navigator.mediaDevices.enumerateDevices();
       setCameras(devices.filter((d) => d.kind === "videoinput"));
       setMics(devices.filter((d) => d.kind === "audioinput"));
-      setPermissionError(null);
-    } catch (err: any) {
-      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
-        setPermissionError("Camera/microphone permission denied. You can still join without media.");
-        setCameraEnabled(false);
-        setMicEnabled(false);
-      } else if (err.name === "NotFoundError") {
-        setPermissionError("No camera or microphone found on this device.");
-        setCameraEnabled(false);
-        setMicEnabled(false);
+      const errors = [videoResult.error, audioResult.error].filter(Boolean);
+      if (!errors.length) setPermissionError(null);
+      else if (errors.some((err: any) => err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError")) {
+        setPermissionError("Camera or microphone permission was denied. Enable access in browser settings, or continue with the available device.");
+      } else if (errors.some((err: any) => err?.name === "NotFoundError" || err?.name === "OverconstrainedError")) {
+        setPermissionError("A selected camera or microphone is unavailable. Choose another device or continue with the available device.");
       } else {
-        setPermissionError("Could not access camera/microphone. You can still join.");
-        setCameraEnabled(false);
-        setMicEnabled(false);
+        setPermissionError("A media device could not start. You can still continue and retry from the room controls.");
       }
+    } catch (err: any) {
+      console.warn("Pre-join media preview failed:", err);
+      setPermissionError("Could not access camera or microphone. You can still join without media.");
+      setCameraEnabled(false);
+      setMicEnabled(false);
     } finally {
-      setLoading(false);
+      if (generation === streamGenerationRef.current) setLoading(false);
     }
   };
 

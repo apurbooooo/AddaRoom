@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Users, Sparkles, X, Loader2 } from "lucide-react";
 import { RoomCapacity } from "@/types";
 import { saveRoomSession } from "@/lib/session-storage";
+import { PreJoinPreview } from "@/components/pre-join-preview";
 
 interface CreateRoomModalProps {
   isOpen: boolean;
@@ -19,21 +20,26 @@ export function CreateRoomModal({ isOpen, onClose }: CreateRoomModalProps) {
   const [avatar, setAvatar] = useState("👑");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
 
   if (!isOpen) return null;
 
   const avatarOptions = ["👑", "🚀", "🦊", "⚡", "🎧", "🎮", "☕", "🦄", "🔥", "🐱"];
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !hostName.trim()) {
       setError("Please provide a room title and your display name.");
       return;
     }
 
-    setLoading(true);
     setError(null);
+    setShowPreview(true);
+  };
 
+  const completeCreate = async (cameraEnabled: boolean, micEnabled: boolean) => {
+    setShowPreview(false);
+    setLoading(true);
     try {
       const res = await fetch("/api/rooms", {
         method: "POST",
@@ -53,6 +59,7 @@ export function CreateRoomModal({ isOpen, onClose }: CreateRoomModalProps) {
 
       // Persist session
       saveRoomSession(data.session);
+      sessionStorage.setItem(`addaroom:join-media:${data.room.roomCode}`, JSON.stringify({ cameraEnabled, micEnabled }));
 
       // Navigate to the created room
       router.push(`/room/${data.room.roomCode}`);
@@ -64,6 +71,7 @@ export function CreateRoomModal({ isOpen, onClose }: CreateRoomModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+      {showPreview && <PreJoinPreview displayName={hostName.trim()} roomTitle={title.trim()} onJoin={completeCreate} onCancel={() => setShowPreview(false)} />}
       <div className="relative w-full max-w-md rounded-2xl bg-[#111111] border border-[#2a2a2a] p-6 shadow-2xl text-white">
         <button
           onClick={onClose}

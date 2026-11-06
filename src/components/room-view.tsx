@@ -20,12 +20,17 @@ import { HostControlsDialog } from "@/components/host/host-controls-dialog";
 import { FloatingReactions } from "@/components/social/floating-reactions";
 import { BrandLogo } from "@/components/brand-logo";
 import { RoomSidebarLeft } from "@/components/room/room-sidebar-left";
+import { MediaQueuePanel } from "@/components/room/media-queue-panel";
+import { MediaStage } from "@/components/room/media-stage";
+import { AddMediaDialog } from "@/components/room/add-media-dialog";
 import { useRoomDataChannel } from "@/hooks/use-room-data-channel";
+import { useMediaQueue } from "@/hooks/use-media-queue";
 import { useAudioPlayback } from "@/hooks/use-audio-playback";
 import { useNoiseFilter } from "@/hooks/use-noise-filter";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { ClientSession, PublicParticipant, ScreenShareQualityMode } from "@/types";
 import { getScreenShareOptions } from "@/lib/media-constraints";
+import { useNetworkTelemetry } from "@/hooks/use-network-telemetry";
 import { createRoomConnectionAttempt } from "@/lib/room-connection-lifecycle";
 import { clearRoomSession } from "@/lib/session-storage";
 import { soundManager } from "@/lib/sound-effects";
@@ -37,6 +42,10 @@ import {
   Volume2,
   RefreshCw,
   FlipHorizontal,
+  ListVideo,
+  PanelLeft,
+  MessageSquare,
+  Crown,
 } from "lucide-react";
 
 interface RoomViewProps {
@@ -44,6 +53,7 @@ interface RoomViewProps {
   initialSession: ClientSession;
   livekitToken: string;
   livekitUrl: string;
+  initialMedia?: { cameraEnabled: boolean; micEnabled: boolean };
 }
 
 /** Browser-level audio constraints for best quality and noise reduction */
@@ -58,6 +68,7 @@ export function RoomView({
   initialSession,
   livekitToken,
   livekitUrl,
+  initialMedia,
 }: RoomViewProps) {
   const router = useRouter();
   const [session, setSession] = useState<ClientSession>(initialSession);
@@ -72,6 +83,7 @@ export function RoomView({
   // Media states — default mic to FALSE; we do NOT auto-start mic on connect
   const [isMicEnabled, setIsMicEnabled] = useState(false);
   const [isVideoEnabled, setIsVideoEnabled] = useState(false);
+  const initialMediaAppliedRef = useRef(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [qualityMode, setQualityMode] = useState<ScreenShareQualityMode>("high");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
@@ -88,12 +100,21 @@ export function RoomView({
   const [roomTitle, setRoomTitle] = useState(session.roomCode);
   const [isLocked, setIsLocked] = useState(false);
   const [hasRoomPassword, setHasRoomPassword] = useState(false);
+  const [hostActionError, setHostActionError] = useState<string | null>(null);
+  const [isMicAllowed, setIsMicAllowed] = useState(true);
+  const [isScreenShareAllowed, setIsScreenShareAllowed] = useState(true);
 
   // Modals & Panels
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [incomingMessage, setIncomingMessage] = useState<{ senderName: string; text: string } | null>(null);
+  const lastNotifiedMessageId = useRef<string | null>(null);
+  const [screenAudioAvailable, setScreenAudioAvailable] = useState<boolean | null>(null);
+  const [fullscreenFallbackNotice, setFullscreenFallbackNotice] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
   const [isHostControlsOpen, setIsHostControlsOpen] = useState(false);
+  const [isAddMediaOpen, setIsAddMediaOpen] = useState(false);
+  const [mobileDrawer, setMobileDrawer] = useState<"participants" | "queue" | "chat" | null>(null);
 
   // Hand raised status
   const [isHandRaised, setIsHandRaised] = useState(false);
@@ -112,6 +133,7 @@ export function RoomView({
 
   // Audio playback hook — handles iOS Safari audio unlock
   const { canPlayAudio, startAudio } = useAudioPlayback(room ?? undefined);
+  const networkMetrics = useNetworkTelemetry(room ?? undefined);
 
   // Noise filter (WebRTC & LiveKit Krisp AI) + fullscreen hooks
   const {
@@ -125,10 +147,20 @@ export function RoomView({
     reapplyKrispIfNeeded,
     cleanupKrisp,
   } = useNoiseFilter({ room });
-  const { isFullscreen, toggleFullscreen } = useFullscreen();
+  const { isFullscreen, isSupported: isFullscreenSupported, toggleFullscreen } = useFullscreen();
+
+  useEffect(() => {
+    if (screenAudioAvailable !== true) return;
+    const timer = window.setTimeout(() => setScreenAudioAvailable(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [screenAudioAvailable]);
 
   // Active speakers tracking
   const [speakingParticipantIds, setSpeakingParticipantIds] = useState<string[]>([]);
+
+  const verifiedHostId =
+    publicParticipants.find((participant) => participant.role === "host")?.id ||
+    (session.role === "host" ? session.participantId : undefined);
 
   // LiveKit data channel hook
   const {
@@ -148,17 +180,30 @@ export function RoomView({
     session.participantId,
     session.displayName,
     session.avatar,
-    publicParticipants.find((participant) => participant.role === "host")?.id,
+    verifiedHostId,
   );
 
-  // Keep unread count up-to-date
+  const isHost = session.role === "host";
+  const hostParticipantId = verifiedHostId;
+  const mediaQueue = useMediaQueue({
+    room,
+    isHost,
+    localParticipantId: session.participantId,
+    hostParticipantId,
+  });
+
+  // Keep unread state and an in-room toast up-to-date without replaying the
+  // notification for our locally optimistic message or duplicate renders.
   useEffect(() => {
-    if (!isChatOpen && messages.length > 0) {
-      const lastMsg = messages[messages.length - 1];
-      if (lastMsg.senderId !== session.participantId) {
-        setUnreadCount((prev) => prev + 1);
-      }
-    }
+    const newest = messages[messages.length - 1];
+    if (!newest || newest.id === lastNotifiedMessageId.current) return;
+    lastNotifiedMessageId.current = newest.id;
+    if (newest.senderId === session.participantId) return;
+    if (isChatOpen) return;
+    setUnreadCount((prev) => prev + 1);
+    setIncomingMessage({ senderName: newest.senderName, text: newest.text.slice(0, 120) });
+    const timer = setTimeout(() => setIncomingMessage(null), 5000);
+    return () => clearTimeout(timer);
   }, [messages, isChatOpen, session.participantId]);
 
   // Handle kicked or room ended events
@@ -184,9 +229,14 @@ export function RoomView({
         setRoomTitle(data.room.title);
         setIsLocked(data.room.status === "locked");
         setPublicParticipants(data.room.participants || []);
+        const self = (data.room.participants || []).find((participant: PublicParticipant) => participant.id === session.participantId);
+        if (self) {
+          setIsMicAllowed(!self.isMutedByHost);
+          setIsScreenShareAllowed(self.canScreenShare);
+        }
       }
     } catch {}
-  }, [roomCode]);
+  }, [roomCode, session.participantId]);
 
   useEffect(() => {
     fetchRoomInfo();
@@ -268,7 +318,7 @@ export function RoomView({
     const handleLocalTrackPublished = (pub: any) => {
       if (!active) return;
       setIsScreenSharing(lkRoom.localParticipant.isScreenShareEnabled);
-      if (pub.kind === "audio") {
+      if (pub.source === Track.Source.Microphone) {
         setIsMicEnabled(true);
         if (pub.track) {
           reapplyKrispIfNeeded(pub.track as LocalAudioTrack).catch((error) => {
@@ -276,17 +326,40 @@ export function RoomView({
           });
         }
       }
-      if (pub.kind === "video" && !lkRoom.localParticipant.isScreenShareEnabled) {
+      if (pub.source === Track.Source.Camera) {
         setIsVideoEnabled(true);
       }
+      if (pub.source === Track.Source.ScreenShareAudio) setScreenAudioAvailable(true);
     };
     const handleLocalTrackUnpublished = (pub: any) => {
       if (!active) return;
       setIsScreenSharing(lkRoom.localParticipant.isScreenShareEnabled);
-      if (pub.kind === "audio") setIsMicEnabled(false);
-      if (pub.kind === "video" && !lkRoom.localParticipant.isScreenShareEnabled) {
+      if (pub.source === Track.Source.Microphone) setIsMicEnabled(false);
+      if (pub.source === Track.Source.Camera) {
         setIsVideoEnabled(false);
       }
+      if (pub.source === Track.Source.ScreenShareAudio) setScreenAudioAvailable(false);
+    };
+    const handleLocalTrackMuted = (pub: any, participant?: Participant) => {
+      if (!active || participant && participant !== lkRoom.localParticipant) return;
+      if (pub.source === Track.Source.Microphone) setIsMicEnabled(false);
+      if (pub.source === Track.Source.Camera) {
+        setIsVideoEnabled(false);
+      }
+    };
+    const handleLocalTrackUnmuted = (pub: any, participant?: Participant) => {
+      if (!active || participant && participant !== lkRoom.localParticipant) return;
+      if (pub.source === Track.Source.Microphone) setIsMicEnabled(true);
+      if (pub.source === Track.Source.Camera) {
+        setIsVideoEnabled(true);
+      }
+    };
+    const handleParticipantPermissionsChanged = (_previousPermissions: unknown, participant?: Participant) => {
+      if (!active || participant && participant !== lkRoom.localParticipant) return;
+      const sources = lkRoom.localParticipant.permissions?.canPublishSources;
+      if (!sources) return;
+      setIsMicAllowed(sources.includes(Track.sourceToProto(Track.Source.Microphone)));
+      setIsScreenShareAllowed(sources.includes(Track.sourceToProto(Track.Source.ScreenShare)));
     };
     const handleActiveSpeakersChanged = (speakers: Participant[]) => {
       if (active) setSpeakingParticipantIds(speakers.map((speaker) => speaker.identity));
@@ -306,6 +379,9 @@ export function RoomView({
         { event: RoomEvent.ParticipantDisconnected, handler: handleParticipantDisconnected },
         { event: RoomEvent.LocalTrackPublished, handler: handleLocalTrackPublished },
         { event: RoomEvent.LocalTrackUnpublished, handler: handleLocalTrackUnpublished },
+        { event: RoomEvent.TrackMuted, handler: handleLocalTrackMuted },
+        { event: RoomEvent.TrackUnmuted, handler: handleLocalTrackUnmuted },
+        { event: RoomEvent.ParticipantPermissionsChanged, handler: handleParticipantPermissionsChanged },
         { event: RoomEvent.ActiveSpeakersChanged, handler: handleActiveSpeakersChanged },
       ],
     );
@@ -356,6 +432,10 @@ export function RoomView({
     if (!room) return;
     setMicError(null);
     const next = !isMicEnabled;
+    if (next && !isMicAllowed) {
+      setMicError("The host has muted your microphone. Ask the host to allow microphone access before unmuting.");
+      return;
+    }
     try {
       await room.localParticipant.setMicrophoneEnabled(next, getMicCaptureOptions(isNoiseEnabled));
       // Only update state AFTER the LiveKit call succeeds
@@ -441,22 +521,62 @@ export function RoomView({
     }
   };
 
+  useEffect(() => {
+    if (!room || !initialMedia || initialMediaAppliedRef.current) return;
+    initialMediaAppliedRef.current = true;
+    const applyInitialMedia = async () => {
+      if (initialMedia.cameraEnabled) {
+        try {
+          await room.localParticipant.setCameraEnabled(true, { facingMode });
+          setIsVideoEnabled(true);
+        } catch (error: any) {
+          setCameraError(error?.name === "NotAllowedError" ? "Camera permission denied. Turn your camera on with the room controls after allowing access." : "Could not start your camera. Use the camera control to retry.");
+        }
+      }
+      if (initialMedia.micEnabled) {
+        try {
+          await room.localParticipant.setMicrophoneEnabled(true, getMicCaptureOptions(isNoiseEnabled));
+          setIsMicEnabled(true);
+        } catch (error: any) {
+          setMicError(error?.name === "NotAllowedError" ? "Microphone permission denied. Allow access and turn your microphone on with the room controls." : "Could not start your microphone. Use the microphone control to retry.");
+        }
+      }
+    };
+    void applyInitialMedia();
+  }, [room, initialMedia, facingMode, getMicCaptureOptions, isNoiseEnabled]);
+
   const handleToggleScreenShare = async () => {
     if (!room) return;
     const next = !isScreenSharing;
+    if (next && !isScreenShareAllowed) {
+      setHostActionError("The host has disabled screen sharing for you.");
+      return;
+    }
     try {
       if (next) {
         const opts = getScreenShareOptions(qualityMode);
         await room.localParticipant.setScreenShareEnabled(true, opts);
         setIsScreenSharing(true);
+        const audioPublication = room.localParticipant.getTrackPublication(Track.Source.ScreenShareAudio);
+        setScreenAudioAvailable(!!audioPublication?.track);
       } else {
         await room.localParticipant.setScreenShareEnabled(false);
         setIsScreenSharing(false);
+        setScreenAudioAvailable(null);
       }
     } catch (err) {
       console.warn("Failed to toggle screen share:", err);
       setIsScreenSharing(false);
     }
+  };
+
+  const handleFullscreenAction = () => {
+    if (isFullscreenSupported) {
+      void toggleFullscreen();
+      return;
+    }
+    setFullscreenFallbackNotice(true);
+    window.setTimeout(() => setFullscreenFallbackNotice(false), 6000);
   };
 
   const handleToggleHandRaise = () => {
@@ -512,7 +632,38 @@ export function RoomView({
     if (res.ok) {
       sendHostBroadcast("kick", targetId);
       fetchRoomInfo();
+    } else {
+      setHostActionError("The kick did not complete. Refresh the participant list and try again.");
     }
+  };
+
+  const handleMuteParticipant = async (targetId: string, muted: boolean) => {
+    const res = await fetch(`/api/rooms/${roomCode}/moderate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ participantId: session.participantId, sessionSecret: session.sessionSecret, action: "mute", targetParticipantId: targetId, muted }),
+    });
+    if (!res.ok) {
+      setHostActionError("Could not update the participant microphone permission.");
+      return;
+    }
+    setHostActionError(null);
+    await fetchRoomInfo();
+    sendHostBroadcast("mute", targetId);
+  };
+
+  const handleSetScreenSharePermission = async (targetId: string, allowed: boolean) => {
+    const res = await fetch(`/api/rooms/${roomCode}/moderate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ participantId: session.participantId, sessionSecret: session.sessionSecret, action: "toggle_screen_share", targetParticipantId: targetId, canScreenShare: allowed }),
+    });
+    if (!res.ok) {
+      setHostActionError("Could not update the participant screen-share permission.");
+      return;
+    }
+    setHostActionError(null);
+    await fetchRoomInfo();
   };
 
   const handleTransferHost = async (targetId: string) => {
@@ -631,36 +782,60 @@ export function RoomView({
     );
   }
 
-  const isHost = session.role === "host";
-
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-black text-white flex flex-col select-none">
+    <div className="relative h-[100dvh] min-h-0 w-full overflow-hidden bg-black text-white flex flex-col select-none">
       {/* Top Header Bar */}
-      <header className="h-14 border-b border-[#2a2a2a] bg-black/90 px-4 flex items-center justify-between backdrop-blur-md z-30 flex-shrink-0">
-        <div className="flex items-center gap-3">
+      <header className="min-h-14 border-b border-[#2a2a2a] bg-black/90 px-2.5 sm:px-4 flex items-center justify-between gap-2 backdrop-blur-md z-30 flex-shrink-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
           <BrandLogo size="sm" />
           <div className="h-4 w-[1px] bg-[#2a2a2a] hidden sm:block" />
-          <div className="flex items-center gap-2">
-            <span className="font-bold text-sm text-white truncate max-w-[140px] sm:max-w-xs">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="font-bold text-xs sm:text-sm text-white truncate max-w-[100px] xs:max-w-[130px] sm:max-w-xs">
               {roomTitle}
             </span>
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-[#111111] border border-[#2a2a2a] text-[11px] text-gray-400 font-medium">
+            <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-[#111111] border border-[#2a2a2a] text-[10px] sm:text-[11px] text-gray-400 font-medium flex-shrink-0">
               <Users className="w-3 h-3 text-brand" />
               <span>{remoteParticipants.length + 1}</span>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
           {isReconnecting && (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[11px] font-semibold animate-pulse">
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[10px] sm:text-[11px] font-semibold animate-pulse">
               <RefreshCw className="w-3 h-3 animate-spin" />
-              <span>Reconnecting...</span>
+              <span className="hidden sm:inline">Reconnecting...</span>
             </div>
           )}
           <button
+            onClick={() => setMobileDrawer("participants")}
+            className="lg:hidden min-w-10 min-h-10 w-10 h-10 rounded-xl border border-[#2a2a2a] bg-[#111] text-gray-300 grid place-items-center hover:bg-[#1a1a1a] transition-colors"
+            aria-label="Open participants"
+            title="Participants"
+          >
+            <Users className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() => setMobileDrawer("queue")}
+            className="lg:hidden min-w-10 min-h-10 w-10 h-10 rounded-xl border border-[#2a2a2a] bg-[#111] text-gray-300 grid place-items-center hover:bg-[#1a1a1a] transition-colors"
+            aria-label="Open media queue"
+            title="Media queue"
+          >
+            <ListVideo className="w-4 h-4" />
+          </button>
+          {isHost && (
+            <button
+              onClick={() => setIsHostControlsOpen(true)}
+              className="lg:hidden min-w-10 min-h-10 w-10 h-10 rounded-xl border border-brand/30 bg-brand/10 text-brand grid place-items-center hover:bg-brand/20 transition-colors"
+              aria-label="Open host controls"
+              title="Host controls"
+            >
+              <Crown className="w-4 h-4" />
+            </button>
+          )}
+          <button
             onClick={() => setIsInviteOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand text-xs font-semibold transition-colors"
+            className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl bg-brand/10 hover:bg-brand/20 border border-brand/30 text-brand text-xs font-semibold transition-colors min-h-[38px]"
           >
             <span>Invite</span>
           </button>
@@ -669,9 +844,11 @@ export function RoomView({
 
       {/* iOS Safari / Android audio unlock banner */}
       {!canPlayAudio && (
-        <div
+        <button
           className="bg-brand/10 border-b border-brand/30 px-4 py-2.5 flex items-center justify-between text-xs text-brand z-30 animate-in fade-in cursor-pointer"
           onClick={startAudio}
+          type="button"
+          aria-label="Tap to enable incoming room audio"
         >
           <div className="flex items-center gap-2">
             <Volume2 className="w-4 h-4 flex-shrink-0" />
@@ -679,7 +856,7 @@ export function RoomView({
               <strong>Tap to enable audio</strong> — your browser blocked autoplay. Tap here to hear other participants.
             </span>
           </div>
-        </div>
+        </button>
       )}
 
       {/* Mic permission error banner */}
@@ -737,50 +914,167 @@ export function RoomView({
       )}
 
       {/* Three-panel layout: Left sidebar | Center media | Right chat (desktop) */}
-      <div className="flex-1 flex overflow-hidden min-h-0">
-        {/* Left sidebar — participants list, desktop only */}
-        <RoomSidebarLeft
-          participants={publicParticipants}
-          localParticipantId={session.participantId}
-          speakingParticipantIds={speakingParticipantIds}
-          className="hidden lg:flex"
-        />
+      <div className="flex-1 flex overflow-hidden min-h-0 relative">
+        {/* Desktop participant and queue rail */}
+        <aside className="hidden lg:flex w-64 xl:w-72 flex-shrink-0 flex-col bg-[#080808] border-r border-[#222] min-h-0">
+          <RoomSidebarLeft participants={publicParticipants} localParticipantId={session.participantId} speakingParticipantIds={speakingParticipantIds} networkMetrics={networkMetrics} className="!w-full !border-r-0 flex-1 min-h-0" />
+          <section className="h-[38%] min-h-[190px] border-t border-[#222] flex-shrink-0">
+            <MediaQueuePanel queue={mediaQueue.queue} currentIndex={mediaQueue.currentIndex} isPlaying={mediaQueue.isPlaying} isHost={isHost} onPlayItem={mediaQueue.playItem} onRemoveItem={mediaQueue.removeItem} onOpenAddMedia={() => setIsAddMediaOpen(true)} />
+          </section>
+        </aside>
 
         {/* Center — video grid + floating reactions */}
-        <main className="flex-1 flex overflow-hidden relative min-w-0">
-          <ParticipantGrid
+        <main className="flex-1 flex flex-col overflow-hidden relative min-w-0 min-h-0 bg-black">
+          {mediaQueue.currentItem && ![room?.localParticipant, ...remoteParticipants].some((participant) => participant?.isScreenShareEnabled) ? (
+            <>
+              <section className="flex-1 min-h-0 p-2 sm:p-3 lg:p-5">
+                <MediaStage currentItem={mediaQueue.currentItem} isPlaying={mediaQueue.isPlaying} currentTime={mediaQueue.currentTime} isHost={isHost} onPlay={mediaQueue.play} onPause={mediaQueue.pause} onSeek={mediaQueue.seek} onEnded={mediaQueue.nextItem} onOpenAddMedia={() => setIsAddMediaOpen(true)} onTimeUpdate={mediaQueue.setCurrentTime} />
+              </section>
+              <section className="h-28 sm:h-32 flex-shrink-0 border-t border-[#222]">
+                <ParticipantGrid localParticipant={room?.localParticipant} remoteParticipants={remoteParticipants} raisedHands={raisedHands} messages={messages} currentParticipantId={session.participantId} onSendMessage={sendMessage} unreadCount={unreadCount} onOpenChat={() => { setIsChatOpen(true); setUnreadCount(0); }} networkMetrics={networkMetrics} onStopScreenShare={handleToggleScreenShare} qualityMode={qualityMode} onChangeQualityMode={setQualityMode} />
+              </section>
+            </>
+          ) : <ParticipantGrid
             localParticipant={room?.localParticipant}
             remoteParticipants={remoteParticipants}
             raisedHands={raisedHands}
             messages={messages}
             currentParticipantId={session.participantId}
+            onSendMessage={sendMessage}
+            unreadCount={unreadCount}
+            onOpenChat={() => setUnreadCount(0)}
+            networkMetrics={networkMetrics}
             onStopScreenShare={() => handleToggleScreenShare()}
             qualityMode={qualityMode}
             onChangeQualityMode={setQualityMode}
-          />
+          />}
+
+          {screenAudioAvailable === true && isScreenSharing && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 max-w-[calc(100%-1.5rem)] rounded-xl border border-brand/30 bg-black/90 px-3 py-2 text-xs text-brand shadow-xl" role="status">
+              Screen audio is being shared. Capture depends on the source and browser; tab audio usually requires “Share tab audio”.
+            </div>
+          )}
+
+          {fullscreenFallbackNotice && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 max-w-[calc(100%-1.5rem)] rounded-xl border border-[#333] bg-black/95 px-3 py-2 text-center text-xs text-gray-200 shadow-xl" role="status">
+              Fullscreen is unavailable in this browser. Rotate your phone for a wider view, or add AddaRoom to your Home Screen to use its standalone layout.
+            </div>
+          )}
+
+          {screenAudioAvailable === false && (
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 max-w-[calc(100%-1.5rem)] rounded-xl border border-amber-400/30 bg-black/90 px-3 py-2 text-xs text-amber-100 shadow-xl" role="status">
+              System audio was not captured. In Chrome, choose a browser tab and enable “Share tab audio”, or select system audio in the picker when available.
+            </div>
+          )}
+
+          {incomingMessage && (
+            <button
+              onClick={() => {
+                if (typeof window !== "undefined" && window.innerWidth < 1024) {
+                  setMobileDrawer("chat");
+                } else {
+                  setIsChatOpen(true);
+                }
+                setUnreadCount(0);
+                setIncomingMessage(null);
+              }}
+              className="absolute top-4 right-4 z-40 max-w-[min(22rem,calc(100%-2rem))] rounded-xl border border-brand/40 bg-black/90 px-4 py-3 text-left shadow-xl backdrop-blur-md"
+              aria-label={`Open chat. ${incomingMessage.senderName} says ${incomingMessage.text}`}
+            >
+              <span className="block text-xs font-bold text-brand">{incomingMessage.senderName}</span>
+              <span className="mt-1 block truncate text-sm text-white">{incomingMessage.text}</span>
+            </button>
+          )}
 
           {/* Floating Social Reactions */}
           <FloatingReactions reactions={activeReactions} />
 
-          {/* Mobile chat drawer (overlay) — full width on mobile, hidden on desktop */}
-          <div className={`absolute inset-0 z-20 lg:hidden transition-transform duration-300 ${isChatOpen ? "translate-x-0" : "translate-x-full"}`}>
-            <ChatPanel
-              isOpen={isChatOpen}
-              onClose={() => setIsChatOpen(false)}
-              messages={messages}
-              currentParticipantId={session.participantId}
-              onSendMessage={sendMessage}
-              onSendTyping={sendTyping}
-              typingUsers={typingUsers}
-            />
-          </div>
+          {/* Mobile Drawers (Slide-up bottom sheet for participants, queue & chat) */}
+          {mobileDrawer && (
+            <div
+              className="fixed inset-0 z-50 lg:hidden bg-black/75 backdrop-blur-sm flex items-end animate-in fade-in duration-200"
+              role="dialog"
+              aria-modal="true"
+              aria-label={
+                mobileDrawer === "participants"
+                  ? "Participants"
+                  : mobileDrawer === "queue"
+                  ? "Media queue"
+                  : "Room chat"
+              }
+            >
+              <button
+                className="absolute inset-0 w-full h-full cursor-default"
+                aria-label="Close drawer"
+                onClick={() => setMobileDrawer(null)}
+              />
+              <section
+                className={`relative z-10 w-full rounded-t-3xl border border-[#292929] border-b-0 bg-[#0b0b0b] flex flex-col overflow-hidden pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl ${
+                  mobileDrawer === "chat" ? "h-[85dvh]" : "max-h-[80dvh] min-h-[45dvh]"
+                }`}
+              >
+                <div className="h-12 px-4 flex items-center justify-between border-b border-[#222] flex-shrink-0 bg-[#0e0e0e]">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-1 rounded-full bg-zinc-600 mx-auto absolute top-2 left-1/2 -translate-x-1/2" />
+                    <h2 className="text-sm font-semibold text-white">
+                      {mobileDrawer === "participants"
+                        ? `Participants · ${publicParticipants.length}`
+                        : mobileDrawer === "queue"
+                        ? `Media Queue · ${mediaQueue.queue.length}`
+                        : `Room Chat · ${messages.length}`}
+                    </h2>
+                  </div>
+                  <button
+                    onClick={() => setMobileDrawer(null)}
+                    className="min-w-10 min-h-10 grid place-items-center rounded-xl text-gray-300 hover:bg-[#1a1a1a]"
+                    aria-label="Close drawer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <div className="flex-1 min-h-0 overflow-y-auto">
+                  {mobileDrawer === "participants" ? (
+                    <RoomSidebarLeft
+                      participants={publicParticipants}
+                      localParticipantId={session.participantId}
+                      speakingParticipantIds={speakingParticipantIds}
+                      networkMetrics={networkMetrics}
+                      className="!w-full !border-r-0 !overflow-y-auto"
+                    />
+                  ) : mobileDrawer === "queue" ? (
+                    <MediaQueuePanel
+                      queue={mediaQueue.queue}
+                      currentIndex={mediaQueue.currentIndex}
+                      isPlaying={mediaQueue.isPlaying}
+                      isHost={isHost}
+                      onPlayItem={mediaQueue.playItem}
+                      onRemoveItem={mediaQueue.removeItem}
+                      onOpenAddMedia={() => setIsAddMediaOpen(true)}
+                    />
+                  ) : (
+                    <ChatPanel
+                      isOpen={true}
+                      isEmbedded={true}
+                      onClose={() => setMobileDrawer(null)}
+                      messages={messages}
+                      currentParticipantId={session.participantId}
+                      onSendMessage={sendMessage}
+                      onSendTyping={sendTyping}
+                      typingUsers={typingUsers}
+                    />
+                  )}
+                </div>
+              </section>
+            </div>
+          )}
         </main>
 
         {/* Right sidebar — chat panel, desktop only, shown when chat open */}
         {isChatOpen && (
-          <aside className="hidden lg:flex w-80 flex-shrink-0 flex-col bg-[#111111] border-l border-[#1a1a1a] overflow-hidden">
+          <aside className="hidden lg:flex w-80 xl:w-[22rem] flex-shrink-0 flex-col bg-[#0b0b0b] border-l border-[#222] overflow-hidden">
             <ChatPanel
               isOpen={isChatOpen}
+              isEmbedded={true}
               onClose={() => { setIsChatOpen(false); }}
               messages={messages}
               currentParticipantId={session.participantId}
@@ -800,11 +1094,14 @@ export function RoomView({
         isHandRaised={isHandRaised}
         isHost={isHost}
         unreadCount={unreadCount}
-        isChatOpen={isChatOpen}
+        isChatOpen={isChatOpen || mobileDrawer === "chat"}
         qualityMode={qualityMode}
         isNoiseEnabled={isNoiseEnabled}
         isBrowserProcessingSupported={isBrowserProcessingSupported}
         isFullscreen={isFullscreen}
+        isFullscreenSupported={isFullscreenSupported}
+        isMicAllowed={isMicAllowed}
+        isScreenShareAllowed={isScreenShareAllowed}
         krispState={krispState}
         isKrispSupported={isKrispSupported}
         krispErrorMessage={krispErrorMessage}
@@ -816,12 +1113,16 @@ export function RoomView({
         onSendReaction={sendReaction}
         onToggleHandRaise={handleToggleHandRaise}
         onToggleChat={() => {
-          setIsChatOpen((prev) => !prev);
+          if (typeof window !== "undefined" && window.innerWidth < 1024) {
+            setMobileDrawer((prev) => (prev === "chat" ? null : "chat"));
+          } else {
+            setIsChatOpen((prev) => !prev);
+          }
           setUnreadCount(0);
         }}
         onToggleNoise={handleToggleNoise}
         onToggleKrisp={toggleKrisp}
-        onToggleFullscreen={toggleFullscreen}
+        onToggleFullscreen={handleFullscreenAction}
         onOpenInvite={() => setIsInviteOpen(true)}
         onOpenHostControls={() => setIsHostControlsOpen(true)}
         onLeaveRoom={handleLeaveRoom}
@@ -852,7 +1153,12 @@ export function RoomView({
         onTransferHost={handleTransferHost}
         onEndRoom={handleEndRoom}
         onSetPassword={handleSetPassword}
+        onMuteParticipant={handleMuteParticipant}
+        onSetScreenSharePermission={handleSetScreenSharePermission}
+        actionError={hostActionError}
       />
+
+      <AddMediaDialog isOpen={isAddMediaOpen} onClose={() => setIsAddMediaOpen(false)} onAddItem={mediaQueue.addItem} localParticipantId={session.participantId} localDisplayName={session.displayName} />
     </div>
   );
 }
