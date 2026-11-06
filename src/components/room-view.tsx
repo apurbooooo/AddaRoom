@@ -7,8 +7,10 @@ import {
   RoomEvent,
   Participant,
   RemoteParticipant,
+  LocalAudioTrack,
   VideoPresets,
   AudioCaptureOptions,
+  Track,
 } from "livekit-client";
 import { ParticipantGrid } from "@/components/media/participant-grid";
 import { RoomControlBar } from "@/components/room-control-bar";
@@ -107,8 +109,18 @@ export function RoomView({
   // Audio playback hook — handles iOS Safari audio unlock
   const { canPlayAudio, startAudio } = useAudioPlayback(room ?? undefined);
 
-  // Noise filter + fullscreen hooks
-  const { isNoiseEnabled, toggleNoise } = useNoiseFilter();
+  // Noise filter (WebRTC & LiveKit Krisp AI) + fullscreen hooks
+  const {
+    isNoiseEnabled,
+    isBrowserProcessingSupported,
+    setNoiseEnabled,
+    krispState,
+    isKrispSupported,
+    krispErrorMessage,
+    toggleKrisp,
+    reapplyKrispIfNeeded,
+    cleanupKrisp,
+  } = useNoiseFilter({ room });
   const { isFullscreen, toggleFullscreen } = useFullscreen();
 
   // Active speakers tracking
@@ -240,6 +252,10 @@ export function RoomView({
 
         lkRoom.on(RoomEvent.Reconnected, () => {
           setIsReconnecting(false);
+          const pub = lkRoom.localParticipant.getTrackPublication(Track.Source.Microphone);
+          if (pub?.track) {
+            reapplyKrispIfNeeded(pub.track as LocalAudioTrack).catch(() => {});
+          }
         });
 
         // Track active speakers for the left sidebar speaking indicators
@@ -249,7 +265,12 @@ export function RoomView({
 
         // Sync track states if reconnecting with published tracks
         lkRoom.on(RoomEvent.LocalTrackPublished, (pub) => {
-          if (pub.kind === "audio") setIsMicEnabled(true);
+          if (pub.kind === "audio") {
+            setIsMicEnabled(true);
+            if (pub.track) {
+              reapplyKrispIfNeeded(pub.track as LocalAudioTrack).catch(() => {});
+            }
+          }
           if (pub.kind === "video" && !lkRoom.localParticipant.isScreenShareEnabled) {
             setIsVideoEnabled(true);
           }
@@ -273,20 +294,33 @@ export function RoomView({
 
     return () => {
       active = false;
+      cleanupKrisp().catch(() => {});
       lkRoom.disconnect();
     };
-  }, [livekitUrl, livekitToken, fetchRoomInfo]);
+  }, [livekitUrl, livekitToken, fetchRoomInfo, cleanupKrisp]);
 
   // ---- Media toggle handlers ----
+
+  const getMicCaptureOptions = useCallback((noiseEnabled: boolean): AudioCaptureOptions => ({
+    noiseSuppression: noiseEnabled,
+    echoCancellation: noiseEnabled,
+    autoGainControl: noiseEnabled,
+  }), []);
 
   const handleToggleMic = async () => {
     if (!room) return;
     setMicError(null);
     const next = !isMicEnabled;
     try {
-      await room.localParticipant.setMicrophoneEnabled(next, MIC_CAPTURE_OPTIONS);
+      await room.localParticipant.setMicrophoneEnabled(next, getMicCaptureOptions(isNoiseEnabled));
       // Only update state AFTER the LiveKit call succeeds
       setIsMicEnabled(next);
+      if (next) {
+        const pub = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+        if (pub?.track) {
+          reapplyKrispIfNeeded(pub.track as LocalAudioTrack).catch(() => {});
+        }
+      }
     } catch (err: any) {
       console.warn("Failed to toggle mic:", err);
       // Provide user-visible error
@@ -300,6 +334,29 @@ export function RoomView({
           : "Could not access microphone. Please check your device.";
       setMicError(msg);
       // Do NOT change isMicEnabled — revert to actual state
+    }
+  };
+
+  const handleToggleNoise = async () => {
+    if (!room) return;
+    const next = !isNoiseEnabled;
+    const publication = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+
+    try {
+      if (isMicEnabled && publication?.track) {
+        await room.localParticipant.unpublishTrack(publication.track, true);
+        await room.localParticipant.setMicrophoneEnabled(true, getMicCaptureOptions(next));
+      }
+      setNoiseEnabled(next);
+    } catch (err) {
+      console.warn("Failed to apply microphone noise reduction setting:", err);
+      if (isMicEnabled && !room.localParticipant.isMicrophoneEnabled) {
+        try {
+          await room.localParticipant.setMicrophoneEnabled(true, getMicCaptureOptions(isNoiseEnabled));
+        } catch (restoreError) {
+          console.error("Failed to restore microphone after noise reduction change:", restoreError);
+        }
+      }
     }
   };
 
@@ -432,6 +489,7 @@ export function RoomView({
   };
 
   const handleEndRoom = async () => {
+    cleanupKrisp().catch(() => {});
     await fetch(`/api/rooms/${roomCode}/end`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -463,6 +521,7 @@ export function RoomView({
 
   const handleLeaveRoom = async () => {
     if (confirm("Leave this room?")) {
+      cleanupKrisp().catch(() => {});
       try {
         await fetch(`/api/rooms/${roomCode}/leave`, {
           method: "POST",
@@ -695,7 +754,11 @@ export function RoomView({
         isChatOpen={isChatOpen}
         qualityMode={qualityMode}
         isNoiseEnabled={isNoiseEnabled}
+        isBrowserProcessingSupported={isBrowserProcessingSupported}
         isFullscreen={isFullscreen}
+        krispState={krispState}
+        isKrispSupported={isKrispSupported}
+        krispErrorMessage={krispErrorMessage}
         onToggleMic={handleToggleMic}
         onToggleVideo={handleToggleVideo}
         onFlipCamera={handleFlipCamera}
@@ -707,7 +770,8 @@ export function RoomView({
           setIsChatOpen((prev) => !prev);
           setUnreadCount(0);
         }}
-        onToggleNoise={toggleNoise}
+        onToggleNoise={handleToggleNoise}
+        onToggleKrisp={toggleKrisp}
         onToggleFullscreen={toggleFullscreen}
         onOpenInvite={() => setIsInviteOpen(true)}
         onOpenHostControls={() => setIsHostControlsOpen(true)}
