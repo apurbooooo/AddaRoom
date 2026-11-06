@@ -7,9 +7,11 @@ export async function checkEndpointRateLimit(
   request: Request,
   endpoint: "create-room" | "join-room",
 ): Promise<boolean> {
-  const secret = process.env.RATE_LIMIT_SECRET || (process.env.NODE_ENV === "production" ? "" : "local-development-rate-limit-key");
+  const secret = process.env.RATE_LIMIT_SECRET
+    || process.env.LIVEKIT_API_SECRET
+    || (process.env.NODE_ENV === "production" ? "" : "local-development-rate-limit-key");
   if (!secret || (process.env.NODE_ENV === "production" && secret === "local-development-rate-limit-key")) {
-    throw new Error("Set a unique RATE_LIMIT_SECRET in production");
+    throw new Error("RATE_LIMIT_SECRET or LIVEKIT_API_SECRET must be configured in production");
   }
 
   // In production, only trust these headers from the configured edge proxy.

@@ -55,3 +55,4 @@ CREATE INDEX IF NOT EXISTS "participants_room_id_idx" ON "participants"("room_id
 CREATE INDEX IF NOT EXISTS "participants_left_at_idx" ON "participants"("left_at");
 CREATE INDEX IF NOT EXISTS "sessions_participant_idx" ON "room_sessions"("participant_id");
 CREATE INDEX IF NOT EXISTS "rate_limit_window_idx" ON "rate_limit_buckets"("window_started_at");
+

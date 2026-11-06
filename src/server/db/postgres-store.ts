@@ -37,6 +37,9 @@ export class PostgresRoomStore implements IRoomStore {
   async consumeRateLimit(key: string, limit: number, windowMs: number): Promise<boolean> {
     const now = new Date();
     const windowExpiry = new Date(now.getTime() - windowMs);
+    const nowIso = now.toISOString();
+    const windowExpiryIso = windowExpiry.toISOString();
+
     if (++this.rateLimitOperations % 128 === 0) {
       await this.db.delete(rateLimitBuckets).where(lt(rateLimitBuckets.windowStartedAt, windowExpiry));
     }
@@ -47,12 +50,12 @@ export class PostgresRoomStore implements IRoomStore {
     }).onConflictDoUpdate({
       target: rateLimitBuckets.key,
       set: {
-        windowStartedAt: sql`case when ${rateLimitBuckets.windowStartedAt} <= ${windowExpiry} then ${now} else ${rateLimitBuckets.windowStartedAt} end`,
-        hitCount: sql`case when ${rateLimitBuckets.windowStartedAt} <= ${windowExpiry} then 1 else ${rateLimitBuckets.hitCount} + 1 end`,
+        windowStartedAt: sql`case when ${rateLimitBuckets.windowStartedAt} <= ${windowExpiryIso}::timestamptz then ${nowIso}::timestamptz else ${rateLimitBuckets.windowStartedAt} end`,
+        hitCount: sql`case when ${rateLimitBuckets.windowStartedAt} <= ${windowExpiryIso}::timestamptz then 1 else ${rateLimitBuckets.hitCount} + 1 end`,
       },
     }).returning({ hitCount: rateLimitBuckets.hitCount });
 
-    return bucket.hitCount <= limit;
+    return (bucket?.hitCount ?? 1) <= limit;
   }
 
   async createRoom(input: CreateRoomInput): Promise<{ room: RoomModel; hostParticipant: ParticipantModel }> {

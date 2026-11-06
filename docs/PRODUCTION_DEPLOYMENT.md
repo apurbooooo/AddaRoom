@@ -105,3 +105,4 @@ AddaRoom includes a built-in **Free Cloud Quota Monitor** located in the **Host 
 - Tracks live call duration and calculates total participant-hours consumed.
 - Automatically displays a non-intrusive advisory banner when a session approaches 90 minutes.
 - Ensures friend groups stay well within the 100 participant-hour monthly quota at zero cost.
+

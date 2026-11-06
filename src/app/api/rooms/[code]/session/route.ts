@@ -10,7 +10,12 @@ export async function POST(
 ) {
   try {
     const { code } = await params;
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
 
     const parsed = sessionAuthSchema.safeParse(body);
     if (!parsed.success) {
@@ -65,7 +70,7 @@ export async function POST(
       livekitUrl,
     });
   } catch (error: any) {
-    console.error("Error resuming session:", error);
+    console.error("[API /api/rooms/[code]/session] Error resuming session:", error?.message || error, error?.stack);
     return NextResponse.json({ error: "Failed to resume session" }, { status: 500 });
   }
 }

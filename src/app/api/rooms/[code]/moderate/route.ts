@@ -9,7 +9,12 @@ export async function POST(
 ) {
   try {
     const { code } = await params;
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
 
     const parsed = moderateRoomSchema.safeParse(body);
     if (!parsed.success) {
@@ -58,7 +63,7 @@ export async function POST(
 
     return NextResponse.json({ error: "Unsupported moderation action" }, { status: 400 });
   } catch (error: any) {
-    console.error("Error performing moderation action:", error);
+    console.error("[API /api/rooms/[code]/moderate] Error performing moderation action:", error?.message || error, error?.stack);
     return NextResponse.json({ error: "Moderation action failed" }, { status: 500 });
   }
 }

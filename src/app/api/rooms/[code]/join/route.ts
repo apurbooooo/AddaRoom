@@ -19,7 +19,12 @@ export async function POST(
       });
     }
     const { code } = await params;
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
 
     const parsed = joinRoomSchema.safeParse(body);
     if (!parsed.success) {
@@ -97,7 +102,7 @@ export async function POST(
       throw joinErr;
     }
   } catch (error: any) {
-    console.error("Error joining room:", error);
+    console.error("[API /api/rooms/[code]/join] Error joining room:", error?.message || error, error?.stack);
     return NextResponse.json(
       { error: "Failed to join room" },
       { status: 500 }

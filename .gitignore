@@ -1,37 +1,26 @@
 # Dependencies
-/node_modules
-/.pnpm-store
+node_modules/
+**/node_modules/
+.pnpm/
+**/.pnpm/
 
-# Next.js build
-/.next/
-/out/
+# Build output
+.next/
+dist/
+build/
+out/
+coverage/
 
-# Production build artifacts
-/build
-/dist
-
-# Environment variables
+# Secrets
 .env
-.env*.local
+.env.*
 !.env.example
 
-# Debug and test
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
-coverage/
-.vitest/
-
-# OS and IDE files
+# Other
+.vercel/
+*.log
 .DS_Store
-*.pem
-.idea/
-.vscode/
-*.swp
-*.swo
 
-# TypeScript build info
+# TypeScript build cache
 *.tsbuildinfo
-next-env.d.ts
-
+.pnpm-store/

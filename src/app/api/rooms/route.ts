@@ -15,7 +15,12 @@ export async function POST(req: Request) {
         headers: { "Retry-After": "900" },
       });
     }
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
     const parsed = createRoomSchema.safeParse(body);
 
     if (!parsed.success) {
@@ -70,7 +75,7 @@ export async function POST(req: Request) {
       livekitUrl,
     });
   } catch (error: any) {
-    console.error("Error creating room:", error);
+    console.error("[API /api/rooms] Error creating room:", error?.message || error, error?.stack);
     return NextResponse.json(
       { error: "Failed to create room. Please try again." },
       { status: 500 }

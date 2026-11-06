@@ -8,7 +8,12 @@ export async function POST(
 ) {
   try {
     const { code } = await params;
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
 
     const parsed = lockRoomSchema.safeParse(body);
     if (!parsed.success) {
@@ -37,7 +42,7 @@ export async function POST(
       message: locked ? "Room locked" : "Room unlocked",
     });
   } catch (error: any) {
-    console.error("Error toggling room lock:", error);
+    console.error("[API /api/rooms/[code]/lock] Error toggling room lock:", error?.message || error, error?.stack);
     return NextResponse.json({ error: "Failed to update room lock" }, { status: 500 });
   }
 }

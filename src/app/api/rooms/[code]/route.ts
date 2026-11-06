@@ -40,7 +40,7 @@ export async function GET(
       },
     });
   } catch (error: any) {
-    console.error("Error fetching room details:", error);
+    console.error("[API /api/rooms/[code]] Error fetching room details:", error?.message || error, error?.stack);
     return NextResponse.json(
       { error: "Failed to fetch room details" },
       { status: 500 }

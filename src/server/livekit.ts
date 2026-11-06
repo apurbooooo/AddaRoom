@@ -5,11 +5,11 @@ function getLiveKitConfig() {
   const production = process.env.NODE_ENV === "production";
   const apiKey = process.env.LIVEKIT_API_KEY || (production ? "" : "devkey");
   const apiSecret = process.env.LIVEKIT_API_SECRET || (production ? "" : "secret");
-  const rawUrl = process.env.LIVEKIT_URL || (production ? "" : process.env.NEXT_PUBLIC_LIVEKIT_URL || "http://localhost:7880");
+  const rawUrl = process.env.LIVEKIT_URL || process.env.NEXT_PUBLIC_LIVEKIT_URL || (production ? "" : "http://localhost:7880");
 
   if (!apiKey || !apiSecret || !rawUrl ||
       (production && (apiKey === "devkey" || apiSecret === "secret"))) {
-    throw new Error("LIVEKIT_API_KEY, LIVEKIT_API_SECRET, and LIVEKIT_URL must be configured in production");
+    throw new Error("LIVEKIT_API_KEY, LIVEKIT_API_SECRET, and LIVEKIT_URL (or NEXT_PUBLIC_LIVEKIT_URL) must be configured in production");
   }
 
   const serverUrl = getServerLiveKitUrl();

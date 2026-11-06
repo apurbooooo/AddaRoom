@@ -8,7 +8,12 @@ export async function POST(
 ) {
   try {
     const { code } = await params;
-    const body = await req.json();
+    let body: unknown;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
 
     const parsed = sessionAuthSchema.safeParse(body);
     if (!parsed.success) {
@@ -30,7 +35,7 @@ export async function POST(
 
     return NextResponse.json({ success: true, message: "Left room successfully" });
   } catch (error: any) {
-    console.error("Error leaving room:", error);
+    console.error("[API /api/rooms/[code]/leave] Error leaving room:", error?.message || error, error?.stack);
     return NextResponse.json({ error: "Failed to leave room" }, { status: 500 });
   }
 }

@@ -61,6 +61,64 @@ describe("AddaRoom Security, Crypto & API Validations", () => {
     });
     expect(emptyName.success).toBe(false);
   });
+
+  it("resolves LiveKit URLs correctly with protocol normalization", async () => {
+    const { getClientLiveKitUrl, getServerLiveKitUrl } = await import("@/lib/livekit-url");
+    const prevLivekitUrl = process.env.LIVEKIT_URL;
+    const prevNextPublicUrl = process.env.NEXT_PUBLIC_LIVEKIT_URL;
+
+    try {
+      process.env.LIVEKIT_URL = "https://my-livekit.cloud";
+      delete process.env.NEXT_PUBLIC_LIVEKIT_URL;
+      expect(getClientLiveKitUrl()).toBe("wss://my-livekit.cloud");
+      expect(getServerLiveKitUrl()).toBe("https://my-livekit.cloud");
+
+      process.env.LIVEKIT_URL = "wss://my-livekit.cloud";
+      expect(getServerLiveKitUrl()).toBe("https://my-livekit.cloud");
+      expect(getClientLiveKitUrl()).toBe("wss://my-livekit.cloud");
+
+      delete process.env.LIVEKIT_URL;
+      process.env.NEXT_PUBLIC_LIVEKIT_URL = "https://public-livekit.cloud";
+      expect(getClientLiveKitUrl()).toBe("wss://public-livekit.cloud");
+      expect(getServerLiveKitUrl()).toBe("https://public-livekit.cloud");
+    } finally {
+      process.env.LIVEKIT_URL = prevLivekitUrl;
+      process.env.NEXT_PUBLIC_LIVEKIT_URL = prevNextPublicUrl;
+    }
+  });
+
+  it("compiles rate limit query parameters as primitive ISO strings without raw Date objects", async () => {
+    const { drizzle } = await import("drizzle-orm/postgres-js");
+    const { sql } = await import("drizzle-orm");
+    const { rateLimitBuckets } = await import("@/server/db/schema");
+
+    const mockClient = { options: { parsers: {}, serializers: {} } };
+    const db = drizzle(mockClient as any, { schema: { rateLimitBuckets } });
+    const now = new Date("2026-01-01T12:00:00.000Z");
+    const windowExpiry = new Date(now.getTime() - 900000);
+    const nowIso = now.toISOString();
+    const windowExpiryIso = windowExpiry.toISOString();
+
+    const q = db.insert(rateLimitBuckets).values({
+      key: "test-client-key",
+      windowStartedAt: now,
+      hitCount: 1,
+    }).onConflictDoUpdate({
+      target: rateLimitBuckets.key,
+      set: {
+        windowStartedAt: sql`case when ${rateLimitBuckets.windowStartedAt} <= ${windowExpiryIso}::timestamptz then ${nowIso}::timestamptz else ${rateLimitBuckets.windowStartedAt} end`,
+        hitCount: sql`case when ${rateLimitBuckets.windowStartedAt} <= ${windowExpiryIso}::timestamptz then 1 else ${rateLimitBuckets.hitCount} + 1 end`,
+      },
+    }).returning({ hitCount: rateLimitBuckets.hitCount });
+
+    const compiled = q.toSQL();
+    expect(compiled.sql).toContain('insert into "rate_limit_buckets"');
+    // Ensure all parameters in the compiled query are primitive strings or numbers
+    for (const param of compiled.params) {
+      expect(typeof param === "string" || typeof param === "number").toBe(true);
+      expect(param instanceof Date).toBe(false);
+    }
+  });
 });
 
 describe("Complete Room Lifecycle End-to-End Simulation", () => {
