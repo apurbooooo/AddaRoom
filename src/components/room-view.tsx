@@ -36,6 +36,8 @@ import { createRoomConnectionAttempt } from "@/lib/room-connection-lifecycle";
 import { clearRoomSession } from "@/lib/session-storage";
 import { soundManager } from "@/lib/sound-effects";
 import { selectIncomingMessages } from "@/lib/chat-notifications";
+import { RoomNotificationToast, RoomNotification } from "@/components/room/room-notification-toast";
+import { capRoomNotifications, getRoomNotificationExpiry } from "@/lib/room-notifications";
 import {
   Loader2,
   AlertTriangle,
@@ -113,8 +115,10 @@ export function RoomView({
   // Modals & Panels
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [incomingMessages, setIncomingMessages] = useState<Array<{ id: string; senderName: string; avatar: string; text: string }>>([]);
+  const [roomNotifications, setRoomNotifications] = useState<RoomNotification[]>([]);
   const notifiedMessageIds = useRef<Set<string>>(new Set());
+  const notifiedParticipantEvents = useRef<Set<string>>(new Set());
+  const notifiedRemoteMicEvents = useRef<Set<string>>(new Set());
   const [screenAudioAvailable, setScreenAudioAvailable] = useState<boolean | null>(null);
   const [fullscreenFallbackNotice, setFullscreenFallbackNotice] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -214,14 +218,41 @@ export function RoomView({
     }
     if (isChatOpen) return;
     setUnreadCount((prev) => prev + newRemoteMessages.length);
-    setIncomingMessages((previous) => [...previous, ...newRemoteMessages.map((message) => ({ id: message.id, senderName: message.senderName, avatar: message.avatar, text: message.text }))].slice(-3));
+    setRoomNotifications((previous) =>
+      capRoomNotifications([
+        ...previous,
+        ...newRemoteMessages.map((message) => ({
+          id: `chat:${message.id}`,
+          kind: "chat" as const,
+          senderName: message.senderName,
+          avatar: message.avatar,
+          text: message.text,
+          expiresAt: getRoomNotificationExpiry(),
+        })),
+      ]),
+    );
   }, [messages, isChatOpen, session.participantId]);
 
   useEffect(() => {
-    if (!incomingMessages.length) return;
-    const timer = window.setTimeout(() => setIncomingMessages((previous) => previous.slice(1)), 5500);
-    return () => window.clearTimeout(timer);
-  }, [incomingMessages]);
+    const timers = roomNotifications.map((notification) => {
+      const delay = Math.max(0, notification.expiresAt - Date.now());
+      return window.setTimeout(() => {
+        setRoomNotifications((previous) => previous.filter((item) => item.id !== notification.id));
+      }, delay);
+    });
+    return () => timers.forEach((timer) => window.clearTimeout(timer));
+  }, [roomNotifications]);
+
+  const dismissRoomNotification = useCallback((id: string) => {
+    setRoomNotifications((previous) => previous.filter((notification) => notification.id !== id));
+  }, []);
+
+  const openChatFromNotification = useCallback((id: string) => {
+    dismissRoomNotification(id);
+    if (typeof window !== "undefined" && window.innerWidth < 1024) setMobileDrawer("chat");
+    else setIsChatOpen(true);
+    setUnreadCount(0);
+  }, [dismissRoomNotification]);
 
   // Handle kicked or room ended events
   useEffect(() => {
@@ -291,7 +322,6 @@ export function RoomView({
       setConnectionStage("connected");
       setConnectingError(null);
       setIsReconnecting(false);
-      soundManager.playJoin();
       updateRemotes();
     };
     const handleDisconnected = (reason?: unknown) => {
@@ -324,15 +354,55 @@ export function RoomView({
         });
       }
     };
-    const handleParticipantConnected = () => {
+    const handleParticipantConnected = (participant?: Participant) => {
       if (!active) return;
-      soundManager.playJoin();
+      const identity = participant?.identity;
+      if (identity && identity !== session.participantId) {
+        const eventKey = `join:${identity}:${attemptId}`;
+        if (!notifiedParticipantEvents.current.has(eventKey)) {
+          notifiedParticipantEvents.current.add(eventKey);
+          soundManager.playJoin();
+          setRoomNotifications((previous) =>
+            capRoomNotifications([
+              ...previous,
+              {
+                id: `participant:${eventKey}`,
+                kind: "join" as const,
+                senderName: participant?.name || identity,
+                avatar: (() => { try { return JSON.parse(participant?.metadata || "{}").avatar || identity; } catch { return identity; } })(),
+                text: "joined the room",
+                expiresAt: getRoomNotificationExpiry(),
+              },
+            ]),
+          );
+        }
+      }
       updateRemotes();
       fetchRoomInfo();
     };
-    const handleParticipantDisconnected = () => {
+    const handleParticipantDisconnected = (participant?: Participant) => {
       if (!active) return;
-      soundManager.playLeave();
+      const identity = participant?.identity;
+      if (identity && identity !== session.participantId) {
+        const eventKey = `leave:${identity}:${attemptId}`;
+        if (!notifiedParticipantEvents.current.has(eventKey)) {
+          notifiedParticipantEvents.current.add(eventKey);
+          soundManager.playLeave();
+          setRoomNotifications((previous) =>
+            capRoomNotifications([
+              ...previous,
+              {
+                id: `participant:${eventKey}`,
+                kind: "leave" as const,
+                senderName: participant?.name || identity,
+                avatar: (() => { try { return JSON.parse(participant?.metadata || "{}").avatar || identity; } catch { return identity; } })(),
+                text: "left the room",
+                expiresAt: getRoomNotificationExpiry(),
+              },
+            ]),
+          );
+        }
+      }
       updateRemotes();
       fetchRoomInfo();
     };
@@ -367,6 +437,14 @@ export function RoomView({
     const handleLocalTrackMuted = (pub: any, participant?: Participant) => {
       if (!active) return;
       if (participant && participant !== lkRoom.localParticipant) {
+        if (pub.source === Track.Source.Microphone) {
+          const eventKey = `${participant.identity}:muted`;
+          notifiedRemoteMicEvents.current.delete(`${participant.identity}:unmuted`);
+          if (!notifiedRemoteMicEvents.current.has(eventKey)) {
+            notifiedRemoteMicEvents.current.add(eventKey);
+            soundManager.playRemoteMicOff();
+          }
+        }
         updateRemotes();
         return;
       }
@@ -378,6 +456,14 @@ export function RoomView({
     const handleLocalTrackUnmuted = (pub: any, participant?: Participant) => {
       if (!active) return;
       if (participant && participant !== lkRoom.localParticipant) {
+        if (pub.source === Track.Source.Microphone) {
+          const eventKey = `${participant.identity}:unmuted`;
+          notifiedRemoteMicEvents.current.delete(`${participant.identity}:muted`);
+          if (!notifiedRemoteMicEvents.current.has(eventKey)) {
+            notifiedRemoteMicEvents.current.add(eventKey);
+            soundManager.playRemoteMicOn();
+          }
+        }
         updateRemotes();
         return;
       }
@@ -475,6 +561,8 @@ export function RoomView({
       await room.localParticipant.setMicrophoneEnabled(next, getMicCaptureOptions(isNoiseEnabled, selectedMicId || undefined));
       // Only update state AFTER the LiveKit call succeeds
       setIsMicEnabled(next);
+      soundManager.unlock();
+      next ? soundManager.playMicOn() : soundManager.playMicOff();
       if (next) {
         const pub = room.localParticipant.getTrackPublication(Track.Source.Microphone);
         if (pub?.track) {
@@ -1046,24 +1134,6 @@ export function RoomView({
             </div>
           )}
 
-          {incomingMessages.length > 0 && (
-            <div className="pointer-events-none absolute top-3 right-3 z-40 flex w-[min(26rem,calc(100%-1.5rem))] flex-col gap-2 sm:top-4 sm:right-4" role="status" aria-live="polite" aria-label="Incoming chat notifications">
-              {incomingMessages.map((incomingMessage) => (
-                <div key={incomingMessage.id} className="pointer-events-auto animate-in slide-in-from-right-5 fade-in duration-300 rounded-2xl border border-brand/35 bg-[#0a0a0a]/95 p-3 shadow-2xl shadow-brand/10 backdrop-blur-xl">
-                  <div className="flex items-start gap-3">
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-xl ring-1 ring-brand/20">{incomingMessage.avatar || "👋"}</div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-bold text-brand">{incomingMessage.senderName}</p>
-                      <p className="mt-1 max-h-20 overflow-y-auto break-words [overflow-wrap:anywhere] text-sm leading-relaxed text-white">{incomingMessage.text}</p>
-                      <button onClick={() => { if (typeof window !== "undefined" && window.innerWidth < 1024) setMobileDrawer("chat"); else setIsChatOpen(true); setUnreadCount(0); setIncomingMessages([]); }} className="mt-2 min-h-8 rounded-lg px-2 text-[10px] font-bold uppercase tracking-wider text-brand hover:bg-brand/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand">Open room chat</button>
-                    </div>
-                    <button onClick={() => setIncomingMessages((previous) => previous.filter((message) => message.id !== incomingMessage.id))} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-gray-400 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand" aria-label={`Dismiss message from ${incomingMessage.senderName}`}><X className="h-4 w-4" /></button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
           {/* Floating Social Reactions */}
           <FloatingReactions reactions={activeReactions} />
 
@@ -1210,6 +1280,12 @@ export function RoomView({
         onOpenInvite={() => setIsInviteOpen(true)}
         onOpenHostControls={() => setIsHostControlsOpen(true)}
         onLeaveRoom={handleLeaveRoom}
+      />
+
+      <RoomNotificationToast
+        notifications={roomNotifications}
+        onDismiss={dismissRoomNotification}
+        onOpenChat={openChatFromNotification}
       />
 
       {/* Invite Modal */}
