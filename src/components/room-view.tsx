@@ -783,7 +783,7 @@ export function RoomView({
   }
 
   return (
-    <div className="relative h-[100dvh] min-h-0 w-full overflow-hidden bg-black text-white flex flex-col select-none">
+    <div className="room-shell relative h-[100dvh] min-h-0 w-full overflow-hidden bg-black text-white flex flex-col select-none">
       {/* Subtle ambient backdrop */}
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden select-none" aria-hidden="true">
         <div className="absolute top-0 right-1/4 w-[500px] h-[300px] rounded-full bg-[radial-gradient(ellipse,rgba(187,251,43,0.02)_0%,transparent_70%)] blur-[100px]" />
@@ -791,7 +791,7 @@ export function RoomView({
       </div>
 
       {/* Top Header Bar */}
-      <header className="min-h-14 border-b border-[#2a2a2a] bg-black/90 px-2.5 sm:px-4 flex items-center justify-between gap-2 backdrop-blur-md z-30 flex-shrink-0">
+      <header className="room-header min-h-14 border-b border-[#2a2a2a] bg-black/90 px-2.5 sm:px-4 flex items-center justify-between gap-2 backdrop-blur-md z-30 flex-shrink-0">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
           <BrandLogo size="sm" />
           <div className="h-4 w-[1px] bg-[#2a2a2a] hidden sm:block" />
@@ -922,7 +922,7 @@ export function RoomView({
       {/* Three-panel layout: Left sidebar | Center media | Right chat (desktop) */}
       <div className="flex-1 flex overflow-hidden min-h-0 relative">
         {/* Desktop participant and queue rail */}
-        <aside className="hidden lg:flex w-64 xl:w-72 flex-shrink-0 flex-col bg-[#080808] border-r border-[#222] min-h-0">
+        <aside className="room-rail hidden lg:flex w-64 xl:w-72 flex-shrink-0 flex-col bg-[#080808] border-r border-[#222] min-h-0">
           <RoomSidebarLeft participants={publicParticipants} localParticipantId={session.participantId} speakingParticipantIds={speakingParticipantIds} networkMetrics={networkMetrics} className="!w-full !border-r-0 flex-1 min-h-0" />
           <section className="h-[38%] min-h-[190px] border-t border-[#222] flex-shrink-0">
             <MediaQueuePanel queue={mediaQueue.queue} currentIndex={mediaQueue.currentIndex} isPlaying={mediaQueue.isPlaying} isHost={isHost} onPlayItem={mediaQueue.playItem} onRemoveItem={mediaQueue.removeItem} onOpenAddMedia={() => setIsAddMediaOpen(true)} />
@@ -930,7 +930,7 @@ export function RoomView({
         </aside>
 
         {/* Center — video grid + floating reactions */}
-        <main className="flex-1 flex flex-col overflow-hidden relative min-w-0 min-h-0 bg-black">
+        <main className="room-canvas flex-1 flex flex-col overflow-hidden relative min-w-0 min-h-0 bg-black">
           {mediaQueue.currentItem && ![room?.localParticipant, ...remoteParticipants].some((participant) => participant?.isScreenShareEnabled) ? (
             <>
               <section className="flex-1 min-h-0 p-2 sm:p-3 lg:p-5">
