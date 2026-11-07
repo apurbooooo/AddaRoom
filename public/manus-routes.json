@@ -1,0 +1,1 @@
+{"routes":[{"path":"/","title":"AddaRoom — Your Circle. Your Room. Your Adda."},{"path":"/join/:code","title":"Join an AddaRoom"},{"path":"/room/:code","title":"AddaRoom Live Room"}]}
