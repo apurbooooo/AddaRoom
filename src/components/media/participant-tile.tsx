@@ -93,7 +93,9 @@ export function ParticipantTile({ participant, isLocal, isHandRaised = false, rt
     const attachRemoteAudio = (track: any) => {
       if (!isLocal && track?.source === Track.Source.Microphone && audioRef.current) {
         track.attach(audioRef.current);
-        audioRef.current.play().catch(() => {});
+        audioRef.current.play().catch((error: unknown) => {
+          console.warn("[ParticipantTile] Remote audio playback was blocked", error);
+        });
       }
     };
 
@@ -190,7 +192,7 @@ export function ParticipantTile({ participant, isLocal, isHandRaised = false, rt
 
   return (
     <div className={`relative w-full h-full min-h-[160px] rounded-2xl overflow-hidden bg-[#111] border transition-all duration-300 flex items-center justify-center select-none shadow-md ${isSpeaking ? "border-brand shadow-brand/20 ring-2 ring-brand/40" : "border-[#2a2a2a] hover:border-[#3a3a3a]"}`}>
-      <video ref={videoRef} autoPlay playsInline muted={isLocal} aria-label={`${participant.name || participant.identity} video`} className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${videoVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`} style={{ transform: getCameraTransform({ isLocal, mirrorLocalPreview, source: Track.Source.Camera }) }} />
+      <video ref={videoRef} autoPlay playsInline muted aria-label={`${participant.name || participant.identity} video`} className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-200 ${videoVisible ? "opacity-100" : "opacity-0 pointer-events-none"}`} style={{ transform: getCameraTransform({ isLocal, mirrorLocalPreview, source: Track.Source.Camera }) }} />
       {!isLocal && <audio ref={audioRef} autoPlay playsInline />}
       {!videoVisible && <div className="absolute inset-0 flex flex-col items-center justify-center bg-[radial-gradient(circle_at_center,rgba(187,251,43,0.08),transparent_55%),linear-gradient(160deg,#141414,#070707)] p-4"><AvatarPortrait avatarId={avatar || participant.identity} size={72} isSpeaking={isSpeaking} className="shadow-2xl" />{cameraState === "initializing" && <span className="mt-3 flex items-center gap-1.5 text-[11px] text-brand"><Loader2 className="h-3 w-3 animate-spin" />Starting camera</span>}{videoPlaybackError && <span className="mt-3 max-w-[15rem] text-center text-[10px] leading-relaxed text-rose-300">Video preview unavailable. Check browser playback permissions.</span>}</div>}
       <div className="absolute top-2.5 left-2.5 flex items-center gap-1.5 z-20">{isHost && <span className="px-1.5 py-0.5 rounded-md bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] font-bold tracking-wider uppercase backdrop-blur-sm">Host</span>}{isHandRaised && <div className="p-1 rounded-md bg-amber-500 text-black shadow-md animate-bounce"><Hand className="w-3.5 h-3.5" /></div>}{isScreenSharing && <div className="p-1 rounded-md bg-brand/20 text-brand border border-brand/30 text-[10px] flex items-center gap-1"><Monitor className="w-3 h-3" /><span className="text-[10px] font-medium hidden sm:inline">Sharing</span></div>}</div>
