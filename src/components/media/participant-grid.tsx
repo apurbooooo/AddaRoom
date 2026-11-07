@@ -47,9 +47,9 @@ export function ParticipantGrid({
 
   if (screenSharer) {
     return (
-      <div className="flex-1 flex flex-col md:flex-row gap-3 p-3 overflow-hidden h-full">
+      <div className="flex-1 flex flex-col md:flex-row gap-3 p-2 sm:p-3 lg:p-5 overflow-hidden h-full bg-[#070707]">
         {/* Main Stage: Screen Share */}
-        <div className="flex-1 h-full min-h-[300px]">
+        <div className="flex-1 h-full min-h-[280px] rounded-3xl border border-white/[0.06] bg-[#0d0d0d] p-1.5 shadow-2xl shadow-black/40">
           <ScreenShareStage
             participant={screenSharer}
             isLocal={screenSharer === localParticipant}
@@ -65,7 +65,7 @@ export function ParticipantGrid({
         </div>
 
         {/* Compact Participant Strip */}
-        <div className="flex md:flex-col gap-2.5 overflow-x-auto md:overflow-y-auto max-h-40 md:max-h-full md:w-56 flex-shrink-0">
+        <div className="flex md:flex-col gap-2.5 overflow-x-auto md:overflow-y-auto max-h-40 md:max-h-full md:w-56 flex-shrink-0 rounded-2xl bg-[#0d0d0d]/80 p-2">
           {allParticipants.map((p) => (
             <div
               key={p.identity}
@@ -97,10 +97,10 @@ export function ParticipantGrid({
   }
 
   return (
-    <div className="flex-1 p-3 overflow-y-auto">
-      <div className={`grid gap-3 h-full max-w-7xl mx-auto ${gridClasses} auto-rows-fr`}>
-        {allParticipants.map((p) => (
-          <div key={p.identity} className="w-full h-full min-h-[180px] sm:min-h-[220px]">
+    <div className="flex-1 min-h-0 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(187,251,43,0.045),transparent_38%),#070707] p-2 sm:p-4 lg:p-6">
+      <div className={`grid gap-3 sm:gap-4 h-full min-h-full max-w-[1440px] mx-auto ${gridClasses} auto-rows-fr`}>
+          {allParticipants.map((p) => (
+          <div key={p.identity} className="w-full h-full min-h-[190px] sm:min-h-[240px] lg:min-h-[280px] rounded-3xl bg-[#0d0d0d] p-1 shadow-xl shadow-black/30">
             <ParticipantTile
               participant={p}
               isLocal={p === localParticipant}
