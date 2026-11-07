@@ -35,6 +35,7 @@ import { useMicrophoneMonitor } from "@/hooks/use-microphone-monitor";
 import { createRoomConnectionAttempt } from "@/lib/room-connection-lifecycle";
 import { clearRoomSession } from "@/lib/session-storage";
 import { soundManager } from "@/lib/sound-effects";
+import { selectIncomingMessages } from "@/lib/chat-notifications";
 import {
   Loader2,
   AlertTriangle,
@@ -112,7 +113,7 @@ export function RoomView({
   // Modals & Panels
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [incomingMessage, setIncomingMessage] = useState<{ id: string; senderName: string; avatar: string; text: string } | null>(null);
+  const [incomingMessages, setIncomingMessages] = useState<Array<{ id: string; senderName: string; avatar: string; text: string }>>([]);
   const notifiedMessageIds = useRef<Set<string>>(new Set());
   const [screenAudioAvailable, setScreenAudioAvailable] = useState<boolean | null>(null);
   const [fullscreenFallbackNotice, setFullscreenFallbackNotice] = useState(false);
@@ -204,7 +205,7 @@ export function RoomView({
   // Keep unread state and an in-room toast up-to-date without replaying the
   // notification for our locally optimistic message or duplicate renders.
   useEffect(() => {
-    const newRemoteMessages = messages.filter((message) => message.senderId !== session.participantId && !notifiedMessageIds.current.has(message.id));
+    const newRemoteMessages = selectIncomingMessages(messages, session.participantId, notifiedMessageIds.current);
     if (!newRemoteMessages.length) return;
     newRemoteMessages.forEach((message) => notifiedMessageIds.current.add(message.id));
     if (notifiedMessageIds.current.size > 500) {
@@ -213,11 +214,14 @@ export function RoomView({
     }
     if (isChatOpen) return;
     setUnreadCount((prev) => prev + newRemoteMessages.length);
-    const newest = newRemoteMessages[newRemoteMessages.length - 1];
-    setIncomingMessage({ id: newest.id, senderName: newest.senderName, avatar: newest.avatar, text: newest.text });
-    const timer = setTimeout(() => setIncomingMessage(null), 5000);
-    return () => clearTimeout(timer);
+    setIncomingMessages((previous) => [...previous, ...newRemoteMessages.map((message) => ({ id: message.id, senderName: message.senderName, avatar: message.avatar, text: message.text }))].slice(-3));
   }, [messages, isChatOpen, session.participantId]);
+
+  useEffect(() => {
+    if (!incomingMessages.length) return;
+    const timer = window.setTimeout(() => setIncomingMessages((previous) => previous.slice(1)), 5500);
+    return () => window.clearTimeout(timer);
+  }, [incomingMessages]);
 
   // Handle kicked or room ended events
   useEffect(() => {
@@ -344,7 +348,7 @@ export function RoomView({
         }
       }
       if (pub.source === Track.Source.Camera) {
-        setIsVideoEnabled(true);
+        setIsVideoEnabled(Boolean(pub.track) && !Boolean(pub.isMuted));
       }
       if (pub.source === Track.Source.ScreenShareAudio) setScreenAudioAvailable(true);
     };
@@ -379,7 +383,7 @@ export function RoomView({
       }
       if (pub.source === Track.Source.Microphone) setIsMicEnabled(true);
       if (pub.source === Track.Source.Camera) {
-        setIsVideoEnabled(true);
+        setIsVideoEnabled(Boolean(pub.track) && !Boolean(pub.isMuted));
       }
     };
     const handleParticipantPermissionsChanged = (_previousPermissions: unknown, participant?: Participant) => {
@@ -535,11 +539,13 @@ export function RoomView({
   const handleToggleVideo = async () => {
     if (!room) return;
     setCameraError(null);
-    const next = !isVideoEnabled;
+    const currentCamera = room.localParticipant.getTrackPublication(Track.Source.Camera);
+    const next = !(Boolean(currentCamera?.track) && !Boolean(currentCamera?.isMuted));
     try {
       await room.localParticipant.setCameraEnabled(next, { facingMode });
       // Only update state AFTER the LiveKit call succeeds
-      setIsVideoEnabled(next);
+      const publication = room.localParticipant.getTrackPublication(Track.Source.Camera);
+      setIsVideoEnabled(Boolean(publication?.track) && !Boolean(publication?.isMuted));
     } catch (err: any) {
       console.warn("Failed to toggle camera:", err);
       const msg =
@@ -575,7 +581,8 @@ export function RoomView({
       if (initialMedia.cameraEnabled) {
         try {
           await room.localParticipant.setCameraEnabled(true, { facingMode });
-          setIsVideoEnabled(true);
+          const publication = room.localParticipant.getTrackPublication(Track.Source.Camera);
+          setIsVideoEnabled(Boolean(publication?.track) && !Boolean(publication?.isMuted));
         } catch (error: any) {
           setCameraError(error?.name === "NotAllowedError" ? "Camera permission denied. Turn your camera on with the room controls after allowing access." : "Could not start your camera. Use the camera control to retry.");
         }
@@ -1039,28 +1046,21 @@ export function RoomView({
             </div>
           )}
 
-          {incomingMessage && (
-            <div className="absolute top-4 right-4 z-40 w-[min(25rem,calc(100%-2rem))] animate-in slide-in-from-right-5 fade-in duration-300" role="status" aria-live="polite">
-              <div className="rounded-2xl border border-brand/40 bg-black/90 p-3 shadow-2xl shadow-brand/10 backdrop-blur-xl">
-                <div className="flex items-start gap-3">
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-xl ring-1 ring-brand/20">{incomingMessage.avatar || "👋"}</div>
-                  <button
-                    onClick={() => {
-                      if (typeof window !== "undefined" && window.innerWidth < 1024) setMobileDrawer("chat");
-                      else setIsChatOpen(true);
-                      setUnreadCount(0);
-                      setIncomingMessage(null);
-                    }}
-                    className="min-w-0 flex-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
-                    aria-label={`Open chat. ${incomingMessage.senderName} says ${incomingMessage.text}`}
-                  >
-                    <span className="block text-sm font-bold text-brand">{incomingMessage.senderName}</span>
-                    <span className="mt-1 block break-words text-sm leading-relaxed text-white">{incomingMessage.text}</span>
-                    <span className="mt-2 block text-[10px] font-semibold uppercase tracking-wider text-gray-500">Open room chat</span>
-                  </button>
-                  <button onClick={() => setIncomingMessage(null)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-gray-400 hover:bg-white/10 hover:text-white" aria-label="Dismiss message notification"><X className="h-4 w-4" /></button>
+          {incomingMessages.length > 0 && (
+            <div className="pointer-events-none absolute top-3 right-3 z-40 flex w-[min(26rem,calc(100%-1.5rem))] flex-col gap-2 sm:top-4 sm:right-4" role="status" aria-live="polite" aria-label="Incoming chat notifications">
+              {incomingMessages.map((incomingMessage) => (
+                <div key={incomingMessage.id} className="pointer-events-auto animate-in slide-in-from-right-5 fade-in duration-300 rounded-2xl border border-brand/35 bg-[#0a0a0a]/95 p-3 shadow-2xl shadow-brand/10 backdrop-blur-xl">
+                  <div className="flex items-start gap-3">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-xl ring-1 ring-brand/20">{incomingMessage.avatar || "👋"}</div>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-bold text-brand">{incomingMessage.senderName}</p>
+                      <p className="mt-1 max-h-20 overflow-y-auto break-words [overflow-wrap:anywhere] text-sm leading-relaxed text-white">{incomingMessage.text}</p>
+                      <button onClick={() => { if (typeof window !== "undefined" && window.innerWidth < 1024) setMobileDrawer("chat"); else setIsChatOpen(true); setUnreadCount(0); setIncomingMessages([]); }} className="mt-2 min-h-8 rounded-lg px-2 text-[10px] font-bold uppercase tracking-wider text-brand hover:bg-brand/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-brand">Open room chat</button>
+                    </div>
+                    <button onClick={() => setIncomingMessages((previous) => previous.filter((message) => message.id !== incomingMessage.id))} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-gray-400 hover:bg-white/10 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-brand" aria-label={`Dismiss message from ${incomingMessage.senderName}`}><X className="h-4 w-4" /></button>
+                  </div>
                 </div>
-              </div>
+              ))}
             </div>
           )}
 
