@@ -56,3 +56,31 @@ CREATE INDEX IF NOT EXISTS "participants_room_id_idx" ON "participants"("room_id
 CREATE INDEX IF NOT EXISTS "participants_left_at_idx" ON "participants"("left_at");
 CREATE INDEX IF NOT EXISTS "sessions_participant_idx" ON "room_sessions"("participant_id");
 CREATE INDEX IF NOT EXISTS "rate_limit_window_idx" ON "rate_limit_buckets"("window_started_at");
+
+
+-- Persistent AddaRoom media queue. Video bytes are never stored here.
+CREATE TABLE IF NOT EXISTS "media_queue_items" (
+  "id" varchar(64) PRIMARY KEY NOT NULL,
+  "room_code" varchar(32) NOT NULL,
+  "source_type" varchar(16) NOT NULL CHECK ("source_type" IN ('youtube', 'direct')),
+  "source_url" varchar(2048) NOT NULL,
+  "title" varchar(200) NOT NULL,
+  "owner_participant_id" varchar(64) NOT NULL REFERENCES "participants"("id") ON DELETE CASCADE,
+  "position" integer NOT NULL,
+  "created_at" timestamptz DEFAULT now() NOT NULL,
+  "updated_at" timestamptz DEFAULT now() NOT NULL
+);
+CREATE INDEX IF NOT EXISTS "media_queue_room_position_idx" ON "media_queue_items"("room_code", "position");
+CREATE UNIQUE INDEX IF NOT EXISTS "media_queue_room_item_idx" ON "media_queue_items"("room_code", "id");
+CREATE TABLE IF NOT EXISTS "media_playback_states" (
+  "room_code" varchar(32) PRIMARY KEY NOT NULL,
+  "current_item_id" varchar(64),
+  "playback_state" varchar(16) DEFAULT 'paused' NOT NULL,
+  "position_seconds" double precision DEFAULT 0 NOT NULL,
+  "playback_started_at" timestamptz,
+  "playback_rate" double precision DEFAULT 1 NOT NULL,
+  "version" integer DEFAULT 0 NOT NULL,
+  "updated_by" varchar(64) NOT NULL,
+  "updated_at" timestamptz DEFAULT now() NOT NULL
+);
+CREATE INDEX IF NOT EXISTS "media_playback_current_idx" ON "media_playback_states"("current_item_id");

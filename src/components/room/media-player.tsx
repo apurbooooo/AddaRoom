@@ -16,6 +16,97 @@ interface MediaPlayerProps {
   onTimeUpdate?: (time: number) => void;
 }
 
+function getYouTubeId(src: string): string | null {
+  try {
+    const url = new URL(src);
+    if (url.hostname.includes("youtu.be")) return url.pathname.slice(1).split("/")[0] || null;
+    return url.searchParams.get("v") || url.pathname.split("/").pop() || null;
+  } catch {
+    return null;
+  }
+}
+
+function YouTubePlayer({ item, isPlaying, currentTime, isHost, onPlay, onPause, onEnded, onTimeUpdate }: MediaPlayerProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<any>(null);
+  const suppressEventsRef = useRef(false);
+  const lastReportedTimeRef = useRef(0);
+  const videoId = getYouTubeId(item.src);
+
+  useEffect(() => {
+    if (!videoId || !containerRef.current) return;
+    let cancelled = false;
+    const start = () => {
+      if (cancelled || !containerRef.current || !(window as any).YT?.Player) return;
+      playerRef.current?.destroy?.();
+      const node = document.createElement("div");
+      containerRef.current.replaceChildren(node);
+      playerRef.current = new (window as any).YT.Player(node, {
+        videoId,
+        playerVars: { controls: isHost ? 1 : 0, playsinline: 1, rel: 0, modestbranding: 1, origin: window.location.origin },
+        events: {
+          onStateChange: (event: any) => {
+            if (!isHost || suppressEventsRef.current) return;
+            if (event.data === 1) onPlay();
+            if (event.data === 2) onPause();
+            if (event.data === 0) onEnded();
+          },
+          onError: () => onPause(),
+        },
+      });
+    };
+    if ((window as any).YT?.Player) start();
+    else {
+      const existing = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+      if (!existing) {
+        const script = document.createElement("script");
+        script.src = "https://www.youtube.com/iframe_api";
+        document.head.appendChild(script);
+      }
+      const previous = (window as any).onYouTubeIframeAPIReady;
+      (window as any).onYouTubeIframeAPIReady = () => { previous?.(); start(); };
+      const timer = window.setInterval(() => { if ((window as any).YT?.Player) { window.clearInterval(timer); start(); } }, 100);
+      return () => { cancelled = true; window.clearInterval(timer); playerRef.current?.destroy?.(); };
+    }
+    return () => { cancelled = true; playerRef.current?.destroy?.(); playerRef.current = null; };
+  }, [videoId, isHost, onPlay, onPause, onEnded]);
+
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player?.getPlayerState) return;
+    suppressEventsRef.current = true;
+    if (isPlaying) player.playVideo?.(); else player.pauseVideo?.();
+    window.setTimeout(() => { suppressEventsRef.current = false; }, 150);
+  }, [isPlaying]);
+
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player?.getCurrentTime) return;
+    const drift = Math.abs((player.getCurrentTime?.() || 0) - currentTime);
+    if (drift > 1.25) {
+      suppressEventsRef.current = true;
+      player.seekTo?.(currentTime, true);
+      window.setTimeout(() => { suppressEventsRef.current = false; }, 150);
+    }
+  }, [currentTime]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const player = playerRef.current;
+      if (!player?.getCurrentTime) return;
+      const time = player.getCurrentTime();
+      if (Math.abs(time - lastReportedTimeRef.current) > 0.05) {
+        lastReportedTimeRef.current = time;
+        onTimeUpdate?.(time);
+      }
+    }, 250);
+    return () => window.clearInterval(timer);
+  }, [onTimeUpdate]);
+
+  if (!videoId) return <div className="grid h-full place-items-center bg-black p-6 text-sm text-rose-300">This YouTube URL could not be embedded.</div>;
+  return <div ref={containerRef} className="relative h-full w-full bg-black" aria-label={`${item.title} YouTube player`} />;
+}
+
 export function MediaPlayer({
   item,
   isPlaying,
@@ -76,13 +167,7 @@ export function MediaPlayer({
   if (item.type === "youtube") {
     return (
       <div className="relative w-full h-full flex flex-col">
-        <iframe
-          src={item.src}
-          className="w-full flex-1 border-0"
-          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; fullscreen"
-          allowFullScreen
-          title={item.title}
-        />
+        <YouTubePlayer {...{ item, isPlaying, currentTime, isHost, onPlay, onPause, onSeek, onEnded, onTimeUpdate }} />
         {!isHost && (
           <div className="px-3 py-1.5 bg-black/70 text-xs text-gray-400 text-center">
             Host controls YouTube playback

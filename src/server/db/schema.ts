@@ -1,4 +1,4 @@
-import { pgTable, varchar, integer, timestamp, boolean, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, varchar, integer, timestamp, boolean, jsonb, index, uniqueIndex, doublePrecision } from "drizzle-orm/pg-core";
 
 export const rooms = pgTable("rooms", {
   id: varchar("id", { length: 64 }).primaryKey(),
@@ -52,3 +52,27 @@ export const rateLimitBuckets = pgTable("rate_limit_buckets", {
   windowStartedAt: timestamp("window_started_at", { withTimezone: true }).notNull(),
   hitCount: integer("hit_count").notNull(),
 }, (table) => [index("rate_limit_window_idx").on(table.windowStartedAt)]);
+
+export const mediaQueueItems = pgTable("media_queue_items", {
+  id: varchar("id", { length: 64 }).primaryKey(),
+  roomCode: varchar("room_code", { length: 32 }).notNull(),
+  sourceType: varchar("source_type", { length: 16 }).notNull(),
+  sourceUrl: varchar("source_url", { length: 2048 }).notNull(),
+  title: varchar("title", { length: 200 }).notNull(),
+  ownerParticipantId: varchar("owner_participant_id", { length: 64 }).notNull().references(() => participants.id, { onDelete: "cascade" }),
+  position: integer("position").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("media_queue_room_position_idx").on(table.roomCode, table.position), uniqueIndex("media_queue_room_item_idx").on(table.roomCode, table.id)]);
+
+export const mediaPlaybackStates = pgTable("media_playback_states", {
+  roomCode: varchar("room_code", { length: 32 }).primaryKey(),
+  currentItemId: varchar("current_item_id", { length: 64 }),
+  playbackState: varchar("playback_state", { length: 16 }).notNull().default("paused"),
+  positionSeconds: doublePrecision("position_seconds").notNull().default(0),
+  playbackStartedAt: timestamp("playback_started_at", { withTimezone: true }),
+  playbackRate: doublePrecision("playback_rate").notNull().default(1),
+  version: integer("version").notNull().default(0),
+  updatedBy: varchar("updated_by", { length: 64 }).notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [index("media_playback_current_idx").on(table.currentItemId)]);

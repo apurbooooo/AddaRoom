@@ -30,6 +30,21 @@ export function ParticipantTile({
   );
   const [showNetworkInfo, setShowNetworkInfo] = useState(false);
 
+  const syncMediaState = () => {
+    const cameraPublication = participant.getTrackPublication(Track.Source.Camera);
+    const microphonePublication = participant.getTrackPublication(Track.Source.Microphone);
+    const cameraPublished = Boolean(cameraPublication?.track || cameraPublication);
+    const microphonePublished = Boolean(microphonePublication?.track || microphonePublication);
+    setIsVideoEnabled(cameraPublished && !Boolean(cameraPublication?.isMuted));
+    setIsAudioMuted(!microphonePublished || Boolean(microphonePublication?.isMuted));
+    setIsScreenSharing(participant.isScreenShareEnabled);
+    setIsSpeaking(
+      Boolean(participant.isSpeaking) &&
+        microphonePublished &&
+        !Boolean(microphonePublication?.isMuted),
+    );
+  };
+
   // Parse custom metadata for avatar
   let avatar = "👋";
   let isHost = false;
@@ -54,6 +69,7 @@ export function ParticipantTile({
           // Autoplay blocked — will be unblocked by room.startAudio() user gesture
         });
       }
+      syncMediaState();
     };
 
     const handleTrackUnsubscribed = (track: any) => {
@@ -66,21 +82,33 @@ export function ParticipantTile({
         if (audioRef.current) track.detach(audioRef.current);
         else track.detach();
       }
+      syncMediaState();
     };
 
     const handleTrackMuted = (pub: any) => {
-      if (pub.kind === Track.Kind.Video) setIsVideoEnabled(false);
-      if (pub.source === Track.Source.Microphone) setIsAudioMuted(true);
+      if (pub.source === Track.Source.Camera) setIsVideoEnabled(false);
+      if (pub.source === Track.Source.Microphone) {
+        setIsAudioMuted(true);
+        setIsSpeaking(false);
+      }
     };
 
     const handleTrackUnmuted = (pub: any) => {
-      if (pub.kind === Track.Kind.Video) setIsVideoEnabled(true);
+      if (pub.source === Track.Source.Camera) setIsVideoEnabled(true);
       if (pub.source === Track.Source.Microphone) setIsAudioMuted(false);
     };
 
     const handleIsSpeakingChanged = (speaking: boolean) => {
-      setIsSpeaking(speaking);
+      const microphonePublication = participant.getTrackPublication(Track.Source.Microphone);
+      setIsSpeaking(
+        speaking &&
+          Boolean(microphonePublication?.track || microphonePublication) &&
+          !Boolean(microphonePublication?.isMuted),
+      );
     };
+
+    const handleTrackPublished = () => syncMediaState();
+    const handleTrackUnpublished = () => syncMediaState();
 
     const handleConnectionQualityChanged = (quality: ConnectionQuality) => {
       setConnectionQuality(quality);
@@ -103,14 +131,14 @@ export function ParticipantTile({
       }
     }
 
-    setIsAudioMuted(!participant.isMicrophoneEnabled);
-    setIsVideoEnabled(participant.isCameraEnabled);
-    setIsScreenSharing(participant.isScreenShareEnabled);
+    syncMediaState();
 
     participant.on("trackSubscribed", handleTrackSubscribed);
     participant.on("trackUnsubscribed", handleTrackUnsubscribed);
     participant.on("trackMuted", handleTrackMuted);
     participant.on("trackUnmuted", handleTrackUnmuted);
+    participant.on("trackPublished", handleTrackPublished);
+    participant.on("trackUnpublished", handleTrackUnpublished);
     participant.on("isSpeakingChanged", handleIsSpeakingChanged);
     participant.on("connectionQualityChanged", handleConnectionQualityChanged);
 
@@ -119,6 +147,8 @@ export function ParticipantTile({
       participant.off("trackUnsubscribed", handleTrackUnsubscribed);
       participant.off("trackMuted", handleTrackMuted);
       participant.off("trackUnmuted", handleTrackUnmuted);
+      participant.off("trackPublished", handleTrackPublished);
+      participant.off("trackUnpublished", handleTrackUnpublished);
       participant.off("isSpeakingChanged", handleIsSpeakingChanged);
       participant.off("connectionQualityChanged", handleConnectionQualityChanged);
       if (videoRef.current) {
@@ -151,7 +181,7 @@ export function ParticipantTile({
         muted={isLocal}
         className={`w-full h-full object-cover transition-opacity duration-300 ${
           isVideoEnabled ? "opacity-100" : "opacity-0 pointer-events-none"
-        }`}
+        } ${isLocal && !isScreenSharing ? "[transform:scaleX(-1)]" : ""}`}
       />
 
       {/* Audio element for remote participants */}

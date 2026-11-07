@@ -155,8 +155,9 @@ export interface PlaybackSyncPacket {
   type: "playback_sync";
   action: "play" | "pause" | "seek" | "next" | "queue_update";
   currentTime?: number;
+  sentAt?: number;
+  version?: number;
   itemId?: string;
   queue?: MediaQueueItem[];
   currentIndex?: number;
 }
-

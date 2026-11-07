@@ -3,6 +3,7 @@
 import React, { useState, useRef } from "react";
 import { X, Youtube, Link, Film, Plus, AlertCircle } from "lucide-react";
 import { MediaQueueItem } from "@/types";
+import { extractYouTubeVideoId, validateDirectMediaUrl } from "@/lib/media-source-validation";
 
 interface AddMediaDialogProps {
   isOpen: boolean;
@@ -13,21 +14,6 @@ interface AddMediaDialogProps {
 }
 
 type Tab = "youtube" | "url" | "file";
-
-function extractYouTubeId(input: string): string | null {
-  const patterns = [
-    /(?:youtube\.com\/watch\?v=)([A-Za-z0-9_-]{11})/,
-    /(?:youtu\.be\/)([A-Za-z0-9_-]{11})/,
-    /(?:youtube\.com\/embed\/)([A-Za-z0-9_-]{11})/,
-  ];
-  for (const p of patterns) {
-    const m = input.match(p);
-    if (m) return m[1];
-  }
-  // Check if input itself is a bare video ID (11 chars)
-  if (/^[A-Za-z0-9_-]{11}$/.test(input.trim())) return input.trim();
-  return null;
-}
 
 export function AddMediaDialog({
   isOpen,
@@ -54,7 +40,7 @@ export function AddMediaDialog({
         setError("Please enter a YouTube URL or video ID.");
         return;
       }
-      const videoId = extractYouTubeId(youtubeInput.trim());
+      const videoId = extractYouTubeVideoId(youtubeInput.trim());
       if (!videoId) {
         setError("Could not extract a valid YouTube video ID from the input.");
         return;
@@ -77,16 +63,15 @@ export function AddMediaDialog({
         setError("Please enter a video URL.");
         return;
       }
-      try {
-        new URL(urlInput.trim());
-      } catch {
-        setError("Please enter a valid URL.");
+      const validatedUrl = validateDirectMediaUrl(urlInput);
+      if (!validatedUrl.ok) {
+        setError(validatedUrl.reason);
         return;
       }
       onAddItem({
         type: "url",
         title: urlTitle.trim() || urlInput.trim().split("/").pop() || "Video",
-        src: urlInput.trim(),
+        src: validatedUrl.url,
         addedBy: localParticipantId,
         addedByName: localDisplayName,
       });
@@ -102,15 +87,7 @@ export function AddMediaDialog({
         setError("Please select a video file.");
         return;
       }
-      const objectUrl = URL.createObjectURL(file);
-      onAddItem({
-        type: "file",
-        title: file.name,
-        src: objectUrl,
-        addedBy: localParticipantId,
-        addedByName: localDisplayName,
-      });
-      onClose();
+      setError("Local files cannot be shared through a browser blob URL. Use screen sharing with system/tab audio, or add a hosted MP4/WebM URL.");
     }
   };
 
@@ -213,7 +190,7 @@ export function AddMediaDialog({
           {activeTab === "file" && (
             <div>
               <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs mb-3">
-                File uploads create a temporary local URL visible only on your device. For shared viewing, use YouTube or a hosted URL.
+                Secure shared uploads are not configured for this room. Local files stay on your device; use screen sharing with system/tab audio, or a hosted MP4/WebM URL.
               </div>
               <input
                 ref={fileRef}

@@ -87,6 +87,13 @@ export function useRoomDataChannel(
   const [ended, setEnded] = useState(false);
 
   const typingTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const seenMessageIds = useRef<Set<string>>(new Set());
+  const seenReactionIds = useRef<Set<string>>(new Set());
+
+  const notifyIncomingMessage = () => {
+    soundManager.playMessage();
+    soundManager.vibrate(35);
+  };
 
   // Handle incoming data packets
   useEffect(() => {
@@ -107,15 +114,23 @@ export function useRoomDataChannel(
 
         switch (data.type) {
           case "chat": {
+            if (seenMessageIds.current.has(data.id)) break;
+            seenMessageIds.current.add(data.id);
+            if (seenMessageIds.current.size > 500) {
+              const oldest = seenMessageIds.current.values().next().value;
+              if (oldest) seenMessageIds.current.delete(oldest);
+            }
             setMessages((prev) => [...prev, data]);
             if (data.senderId !== currentParticipantId) {
-              soundManager.playMessage();
+              notifyIncomingMessage();
             }
             break;
           }
           case "reaction": {
+            if (seenReactionIds.current.has(data.id)) break;
+            seenReactionIds.current.add(data.id);
             setActiveReactions((prev) => [...prev.slice(-30), data]);
-            soundManager.playReaction();
+            if (data.senderId !== currentParticipantId) soundManager.playReaction();
             // Automatically clean up reaction after 3.5s
             setTimeout(() => {
               setActiveReactions((prev) => prev.filter((r) => r.id !== data.id));
@@ -189,6 +204,8 @@ export function useRoomDataChannel(
       room.off(RoomEvent.DataReceived, handleDataReceived);
       typingTimeouts.current.forEach((t) => clearTimeout(t));
       typingTimeouts.current.clear();
+      seenMessageIds.current.clear();
+      seenReactionIds.current.clear();
     };
   }, [room, currentParticipantId, authorizedHostId]);
 
@@ -226,6 +243,7 @@ export function useRoomDataChannel(
       };
 
       // Add locally for instant UI responsiveness
+      seenMessageIds.current.add(packet.id);
       setMessages((prev) => [...prev, packet]);
       // Publish to other room participants reliably
       await publishPacket(packet, true);
@@ -244,6 +262,7 @@ export function useRoomDataChannel(
         timestamp: Date.now(),
       };
 
+      seenReactionIds.current.add(packet.id);
       setActiveReactions((prev) => [...prev.slice(-30), packet]);
       soundManager.playReaction();
       setTimeout(() => {
@@ -315,4 +334,3 @@ export function useRoomDataChannel(
     sendHostBroadcast,
   };
 }
-

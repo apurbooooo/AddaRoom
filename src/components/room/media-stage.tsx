@@ -10,6 +10,7 @@ interface MediaStageProps {
   isPlaying: boolean;
   currentTime: number;
   isHost: boolean;
+  canAddMedia?: boolean;
   onPlay: () => void;
   onPause: () => void;
   onSeek: (time: number) => void;
@@ -23,6 +24,7 @@ export function MediaStage({
   isPlaying,
   currentTime,
   isHost,
+  canAddMedia = true,
   onPlay,
   onPause,
   onSeek,
@@ -42,7 +44,7 @@ export function MediaStage({
             {isHost ? "Add a YouTube video or media URL to start watching together" : "Ask the host to add media"}
           </p>
         </div>
-        {isHost && (
+        {canAddMedia && (
           <button
             onClick={onOpenAddMedia}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand hover:bg-[#ceff44] text-black font-bold text-sm shadow-lg shadow-brand/25 transition-all min-h-[44px]"

@@ -31,6 +31,7 @@ import { useFullscreen } from "@/hooks/use-fullscreen";
 import { ClientSession, PublicParticipant, ScreenShareQualityMode } from "@/types";
 import { getScreenShareOptions } from "@/lib/media-constraints";
 import { useNetworkTelemetry } from "@/hooks/use-network-telemetry";
+import { useMicrophoneMonitor } from "@/hooks/use-microphone-monitor";
 import { createRoomConnectionAttempt } from "@/lib/room-connection-lifecycle";
 import { clearRoomSession } from "@/lib/session-storage";
 import { soundManager } from "@/lib/sound-effects";
@@ -56,6 +57,8 @@ interface RoomViewProps {
   initialMedia?: { cameraEnabled: boolean; micEnabled: boolean };
 }
 
+type RoomConnectionStage = "preparing" | "connecting" | "connected" | "reconnecting" | "failed";
+
 /** Browser-level audio constraints for best quality and noise reduction */
 const MIC_CAPTURE_OPTIONS: AudioCaptureOptions = {
   noiseSuppression: true,
@@ -75,6 +78,7 @@ export function RoomView({
   const [room, setRoom] = useState<Room | null>(null);
   const [connected, setConnected] = useState(false);
   const [connectingError, setConnectingError] = useState<string | null>(null);
+  const [connectionStage, setConnectionStage] = useState<RoomConnectionStage>("preparing");
   const [isReconnecting, setIsReconnecting] = useState(false);
   const [connectionRetry, setConnectionRetry] = useState(0);
   const connectionAttemptRef = useRef(0);
@@ -87,6 +91,7 @@ export function RoomView({
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const [qualityMode, setQualityMode] = useState<ScreenShareQualityMode>("high");
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
+  const [selectedMicId, setSelectedMicId] = useState("");
 
   // Mic permission / error state
   const [micError, setMicError] = useState<string | null>(null);
@@ -107,8 +112,8 @@ export function RoomView({
   // Modals & Panels
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [incomingMessage, setIncomingMessage] = useState<{ senderName: string; text: string } | null>(null);
-  const lastNotifiedMessageId = useRef<string | null>(null);
+  const [incomingMessage, setIncomingMessage] = useState<{ id: string; senderName: string; avatar: string; text: string } | null>(null);
+  const notifiedMessageIds = useRef<Set<string>>(new Set());
   const [screenAudioAvailable, setScreenAudioAvailable] = useState<boolean | null>(null);
   const [fullscreenFallbackNotice, setFullscreenFallbackNotice] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -134,6 +139,8 @@ export function RoomView({
   // Audio playback hook — handles iOS Safari audio unlock
   const { canPlayAudio, startAudio } = useAudioPlayback(room ?? undefined);
   const networkMetrics = useNetworkTelemetry(room ?? undefined);
+  const activeMicTrack = room?.localParticipant.getTrackPublication(Track.Source.Microphone)?.track as LocalAudioTrack | undefined;
+  const { level: micLevel, devices: microphoneDevices } = useMicrophoneMonitor(activeMicTrack);
 
   // Noise filter (WebRTC & LiveKit Krisp AI) + fullscreen hooks
   const {
@@ -190,18 +197,24 @@ export function RoomView({
     isHost,
     localParticipantId: session.participantId,
     hostParticipantId,
+    roomCode,
+    sessionSecret: session.sessionSecret,
   });
 
   // Keep unread state and an in-room toast up-to-date without replaying the
   // notification for our locally optimistic message or duplicate renders.
   useEffect(() => {
-    const newest = messages[messages.length - 1];
-    if (!newest || newest.id === lastNotifiedMessageId.current) return;
-    lastNotifiedMessageId.current = newest.id;
-    if (newest.senderId === session.participantId) return;
+    const newRemoteMessages = messages.filter((message) => message.senderId !== session.participantId && !notifiedMessageIds.current.has(message.id));
+    if (!newRemoteMessages.length) return;
+    newRemoteMessages.forEach((message) => notifiedMessageIds.current.add(message.id));
+    if (notifiedMessageIds.current.size > 500) {
+      const oldest = notifiedMessageIds.current.values().next().value;
+      if (oldest) notifiedMessageIds.current.delete(oldest);
+    }
     if (isChatOpen) return;
-    setUnreadCount((prev) => prev + 1);
-    setIncomingMessage({ senderName: newest.senderName, text: newest.text.slice(0, 120) });
+    setUnreadCount((prev) => prev + newRemoteMessages.length);
+    const newest = newRemoteMessages[newRemoteMessages.length - 1];
+    setIncomingMessage({ id: newest.id, senderName: newest.senderName, avatar: newest.avatar, text: newest.text });
     const timer = setTimeout(() => setIncomingMessage(null), 5000);
     return () => clearTimeout(timer);
   }, [messages, isChatOpen, session.participantId]);
@@ -271,6 +284,7 @@ export function RoomView({
       roomRef.current = lkRoom;
       setRoom(lkRoom);
       setConnected(true);
+      setConnectionStage("connected");
       setConnectingError(null);
       setIsReconnecting(false);
       soundManager.playJoin();
@@ -286,16 +300,19 @@ export function RoomView({
       setConnectingError(
         reason ? `Disconnected from the media server (${String(reason)}).` : "Disconnected from the media server."
       );
+      setConnectionStage("failed");
     };
     const handleReconnecting = () => {
       if (!active) return;
       logDiagnostic("room reconnecting");
       setIsReconnecting(true);
+      setConnectionStage("reconnecting");
     };
     const handleReconnected = () => {
       if (!active) return;
       logDiagnostic("room reconnected");
       setIsReconnecting(false);
+      setConnectionStage("connected");
       const pub = lkRoom.localParticipant.getTrackPublication(Track.Source.Microphone);
       if (pub?.track) {
         reapplyKrispIfNeeded(pub.track as LocalAudioTrack).catch((error) => {
@@ -334,21 +351,32 @@ export function RoomView({
     const handleLocalTrackUnpublished = (pub: any) => {
       if (!active) return;
       setIsScreenSharing(lkRoom.localParticipant.isScreenShareEnabled);
-      if (pub.source === Track.Source.Microphone) setIsMicEnabled(false);
+      if (pub.source === Track.Source.Microphone) {
+        setIsMicEnabled(false);
+        cleanupKrisp().catch(() => {});
+      }
       if (pub.source === Track.Source.Camera) {
         setIsVideoEnabled(false);
       }
       if (pub.source === Track.Source.ScreenShareAudio) setScreenAudioAvailable(false);
     };
     const handleLocalTrackMuted = (pub: any, participant?: Participant) => {
-      if (!active || participant && participant !== lkRoom.localParticipant) return;
+      if (!active) return;
+      if (participant && participant !== lkRoom.localParticipant) {
+        updateRemotes();
+        return;
+      }
       if (pub.source === Track.Source.Microphone) setIsMicEnabled(false);
       if (pub.source === Track.Source.Camera) {
         setIsVideoEnabled(false);
       }
     };
     const handleLocalTrackUnmuted = (pub: any, participant?: Participant) => {
-      if (!active || participant && participant !== lkRoom.localParticipant) return;
+      if (!active) return;
+      if (participant && participant !== lkRoom.localParticipant) {
+        updateRemotes();
+        return;
+      }
       if (pub.source === Track.Source.Microphone) setIsMicEnabled(true);
       if (pub.source === Track.Source.Camera) {
         setIsVideoEnabled(true);
@@ -388,6 +416,7 @@ export function RoomView({
 
     const connectToRoom = async () => {
       logDiagnostic("connection attempt started");
+      setConnectionStage("connecting");
       try {
         await connectionAttempt.connect();
         if (!active) {
@@ -401,6 +430,7 @@ export function RoomView({
         if (!active) return;
         logDiagnostic("connection failed", err);
         setConnectingError(err?.message || "Could not connect to media server.");
+        setConnectionStage("failed");
         setConnected(false);
         roomRef.current = null;
         setRoom(null);
@@ -422,10 +452,11 @@ export function RoomView({
 
   // ---- Media toggle handlers ----
 
-  const getMicCaptureOptions = useCallback((noiseEnabled: boolean): AudioCaptureOptions => ({
+  const getMicCaptureOptions = useCallback((noiseEnabled: boolean, deviceId?: string): AudioCaptureOptions => ({
     noiseSuppression: noiseEnabled,
     echoCancellation: noiseEnabled,
     autoGainControl: noiseEnabled,
+    ...(deviceId ? { deviceId } : {}),
   }), []);
 
   const handleToggleMic = async () => {
@@ -437,7 +468,7 @@ export function RoomView({
       return;
     }
     try {
-      await room.localParticipant.setMicrophoneEnabled(next, getMicCaptureOptions(isNoiseEnabled));
+      await room.localParticipant.setMicrophoneEnabled(next, getMicCaptureOptions(isNoiseEnabled, selectedMicId || undefined));
       // Only update state AFTER the LiveKit call succeeds
       setIsMicEnabled(next);
       if (next) {
@@ -470,14 +501,14 @@ export function RoomView({
     try {
       if (isMicEnabled && publication?.track) {
         await room.localParticipant.unpublishTrack(publication.track, true);
-        await room.localParticipant.setMicrophoneEnabled(true, getMicCaptureOptions(next));
+        await room.localParticipant.setMicrophoneEnabled(true, getMicCaptureOptions(next, selectedMicId || undefined));
       }
       setNoiseEnabled(next);
     } catch (err) {
       console.warn("Failed to apply microphone noise reduction setting:", err);
       if (isMicEnabled && !room.localParticipant.isMicrophoneEnabled) {
         try {
-          await room.localParticipant.setMicrophoneEnabled(true, getMicCaptureOptions(isNoiseEnabled));
+          await room.localParticipant.setMicrophoneEnabled(true, getMicCaptureOptions(isNoiseEnabled, selectedMicId || undefined));
         } catch (restoreError) {
           console.error("Failed to restore microphone after noise reduction change:", restoreError);
         }
@@ -485,6 +516,22 @@ export function RoomView({
     }
   };
 
+  const handleSelectMicrophone = async (deviceId: string) => {
+    if (!room || !isMicEnabled || deviceId === selectedMicId) {
+      setSelectedMicId(deviceId);
+      return;
+    }
+    const publication = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+    try {
+      if (publication?.track) await room.localParticipant.unpublishTrack(publication.track, true);
+      await room.localParticipant.setMicrophoneEnabled(true, getMicCaptureOptions(isNoiseEnabled, deviceId));
+      setSelectedMicId(deviceId);
+      const nextPublication = room.localParticipant.getTrackPublication(Track.Source.Microphone);
+      if (nextPublication?.track) await reapplyKrispIfNeeded(nextPublication.track as LocalAudioTrack);
+    } catch (error: any) {
+      setMicError(error?.name === "OverconstrainedError" || error?.name === "NotFoundError" ? "That microphone is no longer available." : "Could not switch microphones.");
+    }
+  };
   const handleToggleVideo = async () => {
     if (!room) return;
     setCameraError(null);
@@ -736,6 +783,12 @@ export function RoomView({
     }
   };
 
+  const liveKitMicrophoneStates: Record<string, boolean> = {};
+  for (const participant of [room?.localParticipant, ...remoteParticipants]) {
+    if (!participant) continue;
+    const publication = participant.getTrackPublication(Track.Source.Microphone);
+    liveKitMicrophoneStates[participant.identity] = Boolean(publication && !publication.isMuted);
+  }
   if (connectingError) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-white">
@@ -769,14 +822,27 @@ export function RoomView({
   }
 
   if (!connected) {
+    const stageLabel = connectionStage === "preparing"
+      ? "Preparing your private room"
+      : connectionStage === "connecting"
+      ? "Establishing secure connection"
+      : connectionStage === "reconnecting"
+      ? "Reconnecting to your circle"
+      : "Joining your circle";
     return (
-      <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 text-white">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-brand/20 text-brand border border-brand/30 flex items-center justify-center animate-pulse">
+      <div className="relative min-h-screen overflow-hidden bg-black flex flex-col items-center justify-center p-6 text-white">
+        <div className="pointer-events-none absolute -top-32 h-80 w-80 rounded-full bg-brand/10 blur-3xl" />
+        <div className="relative flex w-full max-w-sm flex-col items-center gap-5 rounded-3xl border border-brand/20 bg-[#0c0c0c]/90 p-8 shadow-2xl shadow-brand/5">
+          <div className="grid h-14 w-14 place-items-center rounded-2xl bg-brand/15 text-brand ring-1 ring-brand/30 animate-pulse">
             <Loader2 className="w-6 h-6 animate-spin" />
           </div>
-          <p className="text-sm font-semibold text-white">Entering {roomTitle}...</p>
-          <p className="text-xs text-gray-500">Connecting to secure media SFU</p>
+          <div className="text-center"><p className="text-lg font-bold text-white">{stageLabel}</p><p className="mt-1 text-xs text-gray-500">{roomTitle}</p></div>
+          <div className="w-full space-y-2 text-xs">
+            {["Preparing your private room", "Establishing secure connection", "Joining your circle"].map((label, index) => {
+              const activeIndex = connectionStage === "preparing" ? 0 : connectionStage === "connecting" ? 1 : 2;
+              return <div key={label} className={`flex items-center gap-2 ${index <= activeIndex ? "text-brand" : "text-gray-600"}`}><span className={`h-1.5 w-1.5 rounded-full ${index <= activeIndex ? "bg-brand" : "bg-gray-700"}`} />{label}</div>;
+            })}
+          </div>
         </div>
       </div>
     );
@@ -923,9 +989,9 @@ export function RoomView({
       <div className="flex-1 flex overflow-hidden min-h-0 relative">
         {/* Desktop participant and queue rail */}
         <aside className="room-rail hidden lg:flex w-64 xl:w-72 flex-shrink-0 flex-col bg-[#080808] border-r border-[#222] min-h-0">
-          <RoomSidebarLeft participants={publicParticipants} localParticipantId={session.participantId} speakingParticipantIds={speakingParticipantIds} networkMetrics={networkMetrics} className="!w-full !border-r-0 flex-1 min-h-0" />
+          <RoomSidebarLeft participants={publicParticipants} localParticipantId={session.participantId} speakingParticipantIds={speakingParticipantIds} networkMetrics={networkMetrics} microphoneStates={liveKitMicrophoneStates} className="!w-full !border-r-0 flex-1 min-h-0" />
           <section className="h-[38%] min-h-[190px] border-t border-[#222] flex-shrink-0">
-            <MediaQueuePanel queue={mediaQueue.queue} currentIndex={mediaQueue.currentIndex} isPlaying={mediaQueue.isPlaying} isHost={isHost} onPlayItem={mediaQueue.playItem} onRemoveItem={mediaQueue.removeItem} onOpenAddMedia={() => setIsAddMediaOpen(true)} />
+            <MediaQueuePanel queue={mediaQueue.queue} currentIndex={mediaQueue.currentIndex} isPlaying={mediaQueue.isPlaying} isHost={isHost} localParticipantId={session.participantId} onPlayItem={mediaQueue.playItem} onRemoveItem={mediaQueue.removeItem} onOpenAddMedia={() => setIsAddMediaOpen(true)} />
           </section>
         </aside>
 
@@ -934,7 +1000,7 @@ export function RoomView({
           {mediaQueue.currentItem && ![room?.localParticipant, ...remoteParticipants].some((participant) => participant?.isScreenShareEnabled) ? (
             <>
               <section className="flex-1 min-h-0 p-2 sm:p-3 lg:p-5">
-                <MediaStage currentItem={mediaQueue.currentItem} isPlaying={mediaQueue.isPlaying} currentTime={mediaQueue.currentTime} isHost={isHost} onPlay={mediaQueue.play} onPause={mediaQueue.pause} onSeek={mediaQueue.seek} onEnded={mediaQueue.nextItem} onOpenAddMedia={() => setIsAddMediaOpen(true)} onTimeUpdate={mediaQueue.setCurrentTime} />
+                <MediaStage currentItem={mediaQueue.currentItem} isPlaying={mediaQueue.isPlaying} currentTime={mediaQueue.currentTime} isHost={mediaQueue.canControlCurrentItem} canAddMedia={true} onPlay={mediaQueue.play} onPause={mediaQueue.pause} onSeek={mediaQueue.seek} onEnded={mediaQueue.nextItem} onOpenAddMedia={() => setIsAddMediaOpen(true)} onTimeUpdate={mediaQueue.setCurrentTime} />
               </section>
               <section className="h-28 sm:h-32 flex-shrink-0 border-t border-[#222]">
                 <ParticipantGrid localParticipant={room?.localParticipant} remoteParticipants={remoteParticipants} raisedHands={raisedHands} messages={messages} currentParticipantId={session.participantId} onSendMessage={sendMessage} unreadCount={unreadCount} onOpenChat={() => { setIsChatOpen(true); setUnreadCount(0); }} networkMetrics={networkMetrics} onStopScreenShare={handleToggleScreenShare} qualityMode={qualityMode} onChangeQualityMode={setQualityMode} />
@@ -974,22 +1040,28 @@ export function RoomView({
           )}
 
           {incomingMessage && (
-            <button
-              onClick={() => {
-                if (typeof window !== "undefined" && window.innerWidth < 1024) {
-                  setMobileDrawer("chat");
-                } else {
-                  setIsChatOpen(true);
-                }
-                setUnreadCount(0);
-                setIncomingMessage(null);
-              }}
-              className="absolute top-4 right-4 z-40 max-w-[min(22rem,calc(100%-2rem))] rounded-xl border border-brand/40 bg-black/90 px-4 py-3 text-left shadow-xl backdrop-blur-md"
-              aria-label={`Open chat. ${incomingMessage.senderName} says ${incomingMessage.text}`}
-            >
-              <span className="block text-xs font-bold text-brand">{incomingMessage.senderName}</span>
-              <span className="mt-1 block truncate text-sm text-white">{incomingMessage.text}</span>
-            </button>
+            <div className="absolute top-4 right-4 z-40 w-[min(25rem,calc(100%-2rem))] animate-in slide-in-from-right-5 fade-in duration-300" role="status" aria-live="polite">
+              <div className="rounded-2xl border border-brand/40 bg-black/90 p-3 shadow-2xl shadow-brand/10 backdrop-blur-xl">
+                <div className="flex items-start gap-3">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand/10 text-xl ring-1 ring-brand/20">{incomingMessage.avatar || "👋"}</div>
+                  <button
+                    onClick={() => {
+                      if (typeof window !== "undefined" && window.innerWidth < 1024) setMobileDrawer("chat");
+                      else setIsChatOpen(true);
+                      setUnreadCount(0);
+                      setIncomingMessage(null);
+                    }}
+                    className="min-w-0 flex-1 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                    aria-label={`Open chat. ${incomingMessage.senderName} says ${incomingMessage.text}`}
+                  >
+                    <span className="block text-sm font-bold text-brand">{incomingMessage.senderName}</span>
+                    <span className="mt-1 block break-words text-sm leading-relaxed text-white">{incomingMessage.text}</span>
+                    <span className="mt-2 block text-[10px] font-semibold uppercase tracking-wider text-gray-500">Open room chat</span>
+                  </button>
+                  <button onClick={() => setIncomingMessage(null)} className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-gray-400 hover:bg-white/10 hover:text-white" aria-label="Dismiss message notification"><X className="h-4 w-4" /></button>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Floating Social Reactions */}
@@ -1045,6 +1117,7 @@ export function RoomView({
                       localParticipantId={session.participantId}
                       speakingParticipantIds={speakingParticipantIds}
                       networkMetrics={networkMetrics}
+                      microphoneStates={liveKitMicrophoneStates}
                       className="!w-full !border-r-0 !overflow-y-auto"
                     />
                   ) : mobileDrawer === "queue" ? (
@@ -1053,6 +1126,7 @@ export function RoomView({
                       currentIndex={mediaQueue.currentIndex}
                       isPlaying={mediaQueue.isPlaying}
                       isHost={isHost}
+                      localParticipantId={session.participantId}
                       onPlayItem={mediaQueue.playItem}
                       onRemoveItem={mediaQueue.removeItem}
                       onOpenAddMedia={() => setIsAddMediaOpen(true)}
@@ -1111,6 +1185,9 @@ export function RoomView({
         krispState={krispState}
         isKrispSupported={isKrispSupported}
         krispErrorMessage={krispErrorMessage}
+        micLevel={micLevel}
+        microphoneDevices={microphoneDevices}
+        selectedMicId={selectedMicId}
         onToggleMic={handleToggleMic}
         onToggleVideo={handleToggleVideo}
         onFlipCamera={handleFlipCamera}
@@ -1128,6 +1205,7 @@ export function RoomView({
         }}
         onToggleNoise={handleToggleNoise}
         onToggleKrisp={toggleKrisp}
+        onSelectMicrophone={handleSelectMicrophone}
         onToggleFullscreen={handleFullscreenAction}
         onOpenInvite={() => setIsInviteOpen(true)}
         onOpenHostControls={() => setIsHostControlsOpen(true)}

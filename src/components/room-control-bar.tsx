@@ -51,6 +51,9 @@ interface RoomControlBarProps {
   krispState?: KrispState;
   isKrispSupported?: boolean;
   krispErrorMessage?: string | null;
+  micLevel?: number;
+  microphoneDevices?: MediaDeviceInfo[];
+  selectedMicId?: string;
   onToggleMic: () => void;
   onToggleVideo: () => void;
   onFlipCamera?: () => void;
@@ -61,6 +64,7 @@ interface RoomControlBarProps {
   onToggleChat: () => void;
   onToggleNoise: () => void;
   onToggleKrisp?: () => void;
+  onSelectMicrophone?: (deviceId: string) => void;
   onToggleFullscreen: () => void;
   onOpenInvite: () => void;
   onOpenHostControls: () => void;
@@ -91,6 +95,9 @@ export function RoomControlBar({
   krispState = "off",
   isKrispSupported = true,
   krispErrorMessage = null,
+  micLevel = 0,
+  microphoneDevices = [],
+  selectedMicId = "",
   onToggleMic,
   onToggleVideo,
   onFlipCamera,
@@ -101,6 +108,7 @@ export function RoomControlBar({
   onToggleChat,
   onToggleNoise,
   onToggleKrisp,
+  onSelectMicrophone,
   onToggleFullscreen,
   onOpenInvite,
   onOpenHostControls,
@@ -111,6 +119,8 @@ export function RoomControlBar({
   const [showAudioSettings, setShowAudioSettings] = useState(false);
   const [showMobileMore, setShowMobileMore] = useState(false);
   const [soundOn, setSoundOn] = useState(soundManager.isEnabled());
+  const [soundVolume, setSoundVolume] = useState(soundManager.getVolume());
+  const [vibrationOn, setVibrationOn] = useState(soundManager.isVibrationEnabled());
   const [mobileScreenShareWarning, setMobileScreenShareWarning] = useState<string | null>(null);
 
   const reactionsList = ["❤️", "😂", "👏", "😮", "👍", "🔥"];
@@ -119,6 +129,12 @@ export function RoomControlBar({
     const next = !soundOn;
     soundManager.setEnabled(next);
     setSoundOn(next);
+  };
+
+  const handleToggleVibration = () => {
+    const next = !vibrationOn;
+    soundManager.setVibrationEnabled(next);
+    setVibrationOn(next);
   };
 
   const handleScreenShareClick = () => {
@@ -397,6 +413,31 @@ export function RoomControlBar({
               </div>
 
               <div className="mt-3 space-y-3 text-xs">
+                <div className="rounded-xl border border-brand/20 bg-brand/[0.04] p-3 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-white">Microphone input</span>
+                    <span className="text-[10px] font-mono text-brand">{isMicEnabled ? `${micLevel}%` : "Muted"}</span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-[#242424]" aria-label="Live microphone input level">
+                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-brand to-lime-200 transition-[width] duration-100" style={{ width: `${isMicEnabled ? micLevel : 0}%` }} />
+                  </div>
+                  {microphoneDevices.length > 0 && onSelectMicrophone && (
+                    <label className="block text-[10px] text-gray-400">
+                      Input device
+                      <select value={selectedMicId} onChange={(event) => onSelectMicrophone(event.target.value)} className="mt-1 w-full rounded-lg border border-[#333] bg-[#151515] px-2.5 py-2 text-xs text-white outline-none focus:border-brand">
+                        <option value="">System default</option>
+                        {microphoneDevices.map((device) => <option key={device.deviceId} value={device.deviceId}>{device.label || `Microphone ${device.deviceId.slice(0, 6)}`}</option>)}
+                      </select>
+                    </label>
+                  )}
+                  {!isMicEnabled && <p className="text-[10px] text-gray-500">Turn on your microphone to see live input.</p>}
+                </div>
+                <div className="rounded-xl border border-[#2a2a2a] bg-black p-3 space-y-2">
+                  <div className="flex items-center justify-between"><span className="font-semibold text-white">Notification preferences</span><span className="text-[10px] text-gray-500">This device</span></div>
+                  <label className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={soundOn} onChange={handleToggleSound} className="accent-brand" /> Message sounds</label>
+                  <label className="block text-[10px] text-gray-400">Volume <input aria-label="Notification sound volume" type="range" min="0" max="1" step="0.05" value={soundVolume} onChange={(event) => { const value = Number(event.target.value); setSoundVolume(value); soundManager.setVolume(value); }} className="mt-1 w-full accent-brand" /></label>
+                  <label className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={vibrationOn} onChange={handleToggleVibration} disabled={!soundManager.isVibrationSupported()} className="accent-brand" /> Vibration {soundManager.isVibrationSupported() ? "feedback" : "(unsupported)"}</label>
+                </div>
                 {/* Setting 1: WebRTC Native Browser Noise Suppression */}
                 <div className="p-3 rounded-xl bg-black border border-[#2a2a2a] space-y-2">
                   <div className="flex items-center justify-between gap-2">

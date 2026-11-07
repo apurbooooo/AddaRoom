@@ -261,12 +261,19 @@ export function useNoiseFilter(options?: UseNoiseFilterOptions): UseNoiseFilterR
     async (track?: LocalAudioTrack | null): Promise<void> => {
       if (!krispRequestedRef.current) return;
       const targetTrack = track ?? getLocalMicrophoneTrack();
-      if (!targetTrack) return;
+      if (!targetTrack) {
+        setKrispState("off");
+        setKrispErrorMessage("Krisp is waiting for an active microphone.");
+        return;
+      }
 
       const currentProcessor = targetTrack.getProcessor();
       if (currentProcessor && processorRef.current && currentProcessor === processorRef.current) {
         if (!processorRef.current.isEnabled()) {
           await processorRef.current.setEnabled(true);
+        }
+        if (!processorRef.current.isEnabled()) {
+          throw new Error("Krisp processor did not enable after reconnect.");
         }
         setKrispState("on");
         return;
