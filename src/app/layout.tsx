@@ -12,10 +12,12 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/brand/addaroom-logo.svg", type: "image/svg+xml" },
-      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/brand/addaroom-favicon.svg", type: "image/svg+xml" },
+      { url: "/brand/addaroom-symbol.svg", type: "image/svg+xml" },
+      { url: "/icons/icon-192.svg", sizes: "192x192", type: "image/svg+xml" },
+      { url: "/icons/icon-512.svg", sizes: "512x512", type: "image/svg+xml" },
     ],
-    apple: "/icons/icon-192.png",
+    apple: "/icons/icon-192.svg",
   },
 };
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BrandLogo } from "@/components/brand-logo";
 import { CreateRoomModal } from "@/components/create-room-modal";
@@ -35,11 +35,44 @@ const features = [
   { icon: ShieldCheck, title: "Small by design", copy: "Invite-only rooms for 2–6 people. No feeds, no public directories, no account friction." },
 ];
 
+function Reveal({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    const element = ref.current;
+    if (!element || typeof IntersectionObserver === "undefined") {
+      setVisible(true);
+      return;
+    }
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        setVisible(true);
+        observer.disconnect();
+      }
+    }, { threshold: 0.14, rootMargin: "0px 0px -8% 0px" });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  return <div ref={ref} className={`reveal ${visible ? "reveal--visible" : ""} ${className}`} style={{ "--reveal-delay": `${delay}ms` } as React.CSSProperties}>{children}</div>;
+}
+
 export default function LandingPage() {
   const router = useRouter();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [joinCode, setJoinCode] = useState("");
   const [isJoinCodeOpen, setIsJoinCodeOpen] = useState(false);
+  const demoRef = useRef<HTMLDivElement>(null);
+
+  const handleDemoPointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (event.pointerType !== "mouse" || !demoRef.current) return;
+    const rect = demoRef.current.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width - 0.5) * 8;
+    const y = ((event.clientY - rect.top) / rect.height - 0.5) * 6;
+    demoRef.current.style.setProperty("--demo-px", `${x.toFixed(2)}px`);
+    demoRef.current.style.setProperty("--demo-py", `${y.toFixed(2)}px`);
+  };
 
   const handleJoinByCode = (event: React.FormEvent) => {
     event.preventDefault();
@@ -66,7 +99,7 @@ export default function LandingPage() {
 
       <main>
         <section className="hero-section">
-          <div className="hero-copy">
+          <Reveal className="hero-copy">
             <div className="eyebrow"><span className="eyebrow__dot" /> Private rooms for your people</div>
             <h1>Make space for the <span>good kind</span> of noise.</h1>
             <p className="hero-lede">A private, beautifully simple room to watch, talk, share, and stay close with the people you already know.</p>
@@ -83,9 +116,10 @@ export default function LandingPage() {
               <span><Check className="h-3.5 w-3.5" /> 2–6 friends</span>
               <span><Check className="h-3.5 w-3.5" /> Open source</span>
             </div>
-          </div>
+          </Reveal>
 
-          <div className="demo-wrap" aria-label="Animated AddaRoom product demonstration">
+          <Reveal className="demo-wrap" delay={120}>
+            <div ref={demoRef} onPointerMove={handleDemoPointerMove} onPointerLeave={() => { demoRef.current?.style.setProperty("--demo-px", "0px"); demoRef.current?.style.setProperty("--demo-py", "0px"); }} aria-label="Animated AddaRoom product demonstration">
             <div className="demo-orbit demo-orbit--one" />
             <div className="demo-orbit demo-orbit--two" />
             <div className="demo-window">
@@ -117,17 +151,18 @@ export default function LandingPage() {
               <div className="demo-window__footer"><div><span className="demo-control demo-control--active"><Mic2 className="h-3.5 w-3.5" /></span><span className="demo-control"><Video className="h-3.5 w-3.5" /></span><span className="demo-control demo-control--share"><MonitorUp className="h-3.5 w-3.5" /></span></div><span className="demo-window__hint">Screen share is on</span><span className="demo-control demo-control--end">Leave</span></div>
             </div>
             <div className="demo-caption"><span className="demo-caption__line" /><span>Everything you need, nothing in the way.</span></div>
-          </div>
+            </div>
+          </Reveal>
         </section>
 
-        <section className="signal-strip"><div><span className="signal-strip__mark">01</span><span>Built for the in-between moments</span></div><div className="signal-strip__line" /><div><span>Always private</span><LockKeyhole className="h-3.5 w-3.5 text-[#BBFB2B]" /></div></section>
+        <Reveal><section className="signal-strip"><div><span className="signal-strip__mark">01</span><span>Built for the in-between moments</span></div><div className="signal-strip__line" /><div><span>Always private</span><LockKeyhole className="h-3.5 w-3.5 text-[#BBFB2B]" /></div></section></Reveal>
 
-        <section className="feature-section">
+        <Reveal><section className="feature-section">
           <div className="section-intro"><div className="eyebrow">The room is yours</div><h2>Less platform.<br /><span>More presence.</span></h2><p>AddaRoom keeps the useful parts of being together and leaves the noise at the door.</p></div>
           <div className="feature-list">{features.map(({ icon: Icon, title, copy }, index) => <article className="feature-item" key={title}><span className="feature-item__index">0{index + 1}</span><div className="feature-item__icon"><Icon className="h-5 w-5" /></div><div><h3>{title}</h3><p>{copy}</p></div><ArrowUpRight className="feature-item__arrow h-4 w-4" /></article>)}</div>
-        </section>
+        </section></Reveal>
 
-        <section className="closing-section"><Sparkles className="h-5 w-5 text-[#BBFB2B]" /><h2>Your people are one code away.</h2><button className="button button--lime button--large" onClick={() => setIsCreateOpen(true)}>Start an Adda <ArrowUpRight className="h-4 w-4" /></button></section>
+        <Reveal><section className="closing-section"><Sparkles className="h-5 w-5 text-[#BBFB2B]" /><h2>Your people are one code away.</h2><button className="button button--lime button--large" onClick={() => setIsCreateOpen(true)}>Start an Adda <ArrowUpRight className="h-4 w-4" /></button></section></Reveal>
       </main>
 
       <footer className="site-footer"><BrandLogo size="sm" /><span>Open-source under MIT. Made for small circles.</span><span className="hidden sm:inline">Powered by LiveKit &amp; Next.js</span></footer>
