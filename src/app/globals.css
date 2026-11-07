@@ -24,7 +24,7 @@
   --radius: 0.75rem;
   --brand: #bbfb2b;
   --warm: #f4f7ef;
-  --muted: #8b9189;
+  --muted: 120 5% 55%;
   --line: rgba(244, 247, 239, 0.12);
   --panel: rgba(12, 14, 12, 0.82);
 }
