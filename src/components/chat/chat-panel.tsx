@@ -111,7 +111,7 @@ export function ChatPanel({
             </div>
 
             {/* Messages Scroll Area */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3.5">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3.5" role="log" aria-live="polite" aria-relevant="additions" aria-label="Room messages">
                 {messages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center p-6 text-slate-500">
                         <div className="w-12 h-12 rounded-2xl bg-[#151515] border border-[#292929] flex items-center justify-center mb-3 text-brand">
@@ -173,7 +173,8 @@ export function ChatPanel({
                                             {/* Reply button on hover */}
                                             <button
                                                 onClick={() => setReplyingTo(msg)}
-                                                className="opacity-0 group-hover:opacity-100 absolute -bottom-5 right-1 px-1.5 py-0.5 rounded text-[10px] bg-slate-900 border border-slate-700 text-slate-400 hover:text-white transition-opacity"
+                                                aria-label={`Reply to ${msg.senderName}`}
+                                                className="opacity-0 group-hover:opacity-100 focus-visible:opacity-100 touch:opacity-100 absolute -bottom-5 right-1 px-1.5 py-0.5 rounded text-[10px] bg-slate-900 border border-slate-700 text-slate-400 hover:text-white transition-opacity"
                                             >
                                                 Reply
                                             </button>

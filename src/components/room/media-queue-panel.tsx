@@ -9,6 +9,7 @@ interface MediaQueuePanelProps {
   currentIndex: number;
   isPlaying: boolean;
   isHost: boolean;
+  localParticipantId: string;
   onPlayItem: (index: number) => void;
   onRemoveItem: (itemId: string) => void;
   onOpenAddMedia: () => void;
@@ -30,6 +31,7 @@ export function MediaQueuePanel({
   currentIndex,
   isPlaying,
   isHost,
+  localParticipantId,
   onPlayItem,
   onRemoveItem,
   onOpenAddMedia,
@@ -40,7 +42,7 @@ export function MediaQueuePanel({
         <span className="text-xs font-bold uppercase tracking-wider text-gray-400">
           Media Queue ({queue.length})
         </span>
-        {isHost && (
+        {true && (
           <button
             onClick={onOpenAddMedia}
             className="flex items-center gap-1 px-2 py-1 rounded-lg bg-brand/20 hover:bg-brand/30 text-brand text-xs font-semibold transition-colors min-h-[28px]"
@@ -73,7 +75,7 @@ export function MediaQueuePanel({
                   <p className="text-[10px] text-gray-500 truncate">by {item.addedByName}</p>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">
-                  {isHost && !isCurrent && (
+                  {(isHost || item.addedBy === localParticipantId) && !isCurrent && (
                     <button
                       onClick={() => onPlayItem(idx)}
                       className="p-1 rounded-lg hover:bg-brand/20 text-brand transition-colors min-w-[24px] min-h-[24px] flex items-center justify-center"
@@ -85,7 +87,7 @@ export function MediaQueuePanel({
                   {isCurrent && isPlaying && (
                     <span className="w-2 h-2 rounded-full bg-brand animate-pulse flex-shrink-0" />
                   )}
-                  {isHost && (
+                  {(isHost || item.addedBy === localParticipantId) && (
                     <button
                       onClick={() => onRemoveItem(item.id)}
                       className="p-1 rounded-lg hover:bg-rose-500/20 text-rose-400 transition-colors min-w-[24px] min-h-[24px] flex items-center justify-center"

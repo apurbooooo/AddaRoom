@@ -5,7 +5,7 @@ const WINDOW_MS = 15 * 60 * 1000;
 
 export async function checkEndpointRateLimit(
   request: Request,
-  endpoint: "create-room" | "join-room",
+  endpoint: "create-room" | "join-room" | "media-queue-write",
 ): Promise<boolean> {
   const secret = process.env.RATE_LIMIT_SECRET
     || process.env.LIVEKIT_API_SECRET
@@ -21,6 +21,6 @@ export async function checkEndpointRateLimit(
     || request.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
     || "unknown-client";
   const key = createHmac("sha256", secret).update(`${endpoint}:${address}`).digest("hex");
-  const limit = endpoint === "create-room" ? 5 : 20;
+  const limit = endpoint === "create-room" ? 5 : endpoint === "media-queue-write" ? 60 : 20;
   return roomStore.consumeRateLimit(key, limit, WINDOW_MS);
 }

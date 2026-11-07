@@ -12,6 +12,7 @@ interface RoomSidebarLeftProps {
   localParticipantId: string;
   speakingParticipantIds: string[];
   networkMetrics: Record<string, ParticipantNetworkTelemetry>;
+  microphoneStates?: Record<string, boolean>;
   className?: string;
 }
 
@@ -20,6 +21,7 @@ export function RoomSidebarLeft({
   localParticipantId,
   speakingParticipantIds,
   networkMetrics,
+  microphoneStates = {},
   className = "",
 }: RoomSidebarLeftProps) {
   const isSpeaking = (id: string) => speakingParticipantIds.includes(id);
@@ -88,7 +90,7 @@ export function RoomSidebarLeft({
 
                 {/* Mic status */}
                 <div className="flex-shrink-0">
-                  {p.isMutedByHost ? (
+                  {microphoneStates[p.id] === false || (microphoneStates[p.id] === undefined && p.isMutedByHost) ? (
                     <MicOff className="w-3.5 h-3.5 text-rose-400" />
                   ) : (
                     <Mic className="w-3.5 h-3.5 text-gray-500" />

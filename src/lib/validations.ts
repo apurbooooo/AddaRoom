@@ -55,3 +55,17 @@ export const setRoomPasswordSchema = sessionAuthSchema.extend({
 export const joinRoomWithPasswordSchema = joinRoomSchema.extend({
   password: z.string().max(50).optional(),
 });
+
+export const mediaQueueAddSchema = sessionAuthSchema.extend({
+  sourceType: z.enum(["youtube", "direct"]),
+  sourceUrl: z.string().trim().min(1).max(2048),
+  title: z.string().trim().min(1).max(200),
+});
+
+export const mediaQueuePlaybackSchema = sessionAuthSchema.extend({
+  action: z.enum(["play", "pause", "seek", "restart", "ended"]),
+  currentItemId: z.string().nullable().optional(),
+  positionSeconds: z.number().finite().min(0).max(24 * 60 * 60),
+  playbackRate: z.number().finite().min(0.5).max(2).optional(),
+  expectedVersion: z.number().int().min(0).optional(),
+});
