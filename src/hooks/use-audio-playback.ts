@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { Room, RoomEvent } from "livekit-client";
+import { soundManager } from "@/lib/sound-effects";
 
 /**
  * Manages audio playback state for iOS Safari and other browsers that block
@@ -35,6 +36,7 @@ export function useAudioPlayback(room: Room | undefined) {
     if (!room) return false;
     try {
       await room.startAudio();
+      soundManager.unlock();
       setCanPlayAudio(room.canPlaybackAudio);
       return room.canPlaybackAudio;
     } catch (err) {

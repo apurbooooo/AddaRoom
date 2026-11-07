@@ -3,6 +3,10 @@
 const SOUND_KEY = "addaroom_sound_enabled";
 const VOLUME_KEY = "addaroom_sound_volume";
 const VIBRATION_KEY = "addaroom_vibration_enabled";
+const CHAT_KEY = "addaroom_sound_chat";
+const PARTICIPANT_KEY = "addaroom_sound_participant";
+const MICROPHONE_KEY = "addaroom_sound_microphone";
+const REMOTE_MIC_KEY = "addaroom_sound_remote_microphone";
 
 function readBoolean(key: string, fallback: boolean): boolean {
   if (typeof window === "undefined") return fallback;
@@ -29,14 +33,21 @@ class SoundEffectManager {
   private soundEnabled = readBoolean(SOUND_KEY, true);
   private volume = readVolume();
   private vibrationEnabled = readBoolean(VIBRATION_KEY, true);
+  private chatEnabled = readBoolean(CHAT_KEY, true);
+  private participantEnabled = readBoolean(PARTICIPANT_KEY, true);
+  private microphoneEnabled = readBoolean(MICROPHONE_KEY, true);
+  private remoteMicrophoneEnabled = readBoolean(REMOTE_MIC_KEY, false);
+  private contextReady = false;
 
   private getContext(): AudioContext | null {
     if (typeof window === "undefined") return null;
     if (!this.ctx) {
       const AudioCtx = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-      if (AudioCtx) this.ctx = new AudioCtx();
+      if (AudioCtx) {
+        this.ctx = new AudioCtx();
+        this.contextReady = this.ctx.state === "running";
+      }
     }
-    if (this.ctx?.state === "suspended") this.ctx.resume().catch(() => {});
     return this.ctx;
   }
 
@@ -44,6 +55,21 @@ class SoundEffectManager {
   public setEnabled(enabled: boolean): void {
     this.soundEnabled = enabled;
     try { localStorage.setItem(SOUND_KEY, String(enabled)); } catch {}
+  }
+  public isChatEnabled(): boolean { return this.chatEnabled; }
+  public setChatEnabled(enabled: boolean): void { this.chatEnabled = enabled; try { localStorage.setItem(CHAT_KEY, String(enabled)); } catch {} }
+  public isParticipantEnabled(): boolean { return this.participantEnabled; }
+  public setParticipantEnabled(enabled: boolean): void { this.participantEnabled = enabled; try { localStorage.setItem(PARTICIPANT_KEY, String(enabled)); } catch {} }
+  public isMicrophoneEnabled(): boolean { return this.microphoneEnabled; }
+  public setMicrophoneEnabled(enabled: boolean): void { this.microphoneEnabled = enabled; try { localStorage.setItem(MICROPHONE_KEY, String(enabled)); } catch {} }
+  public isRemoteMicrophoneEnabled(): boolean { return this.remoteMicrophoneEnabled; }
+  public setRemoteMicrophoneEnabled(enabled: boolean): void { this.remoteMicrophoneEnabled = enabled; try { localStorage.setItem(REMOTE_MIC_KEY, String(enabled)); } catch {} }
+  public isReady(): boolean { return this.contextReady && this.ctx?.state === "running"; }
+  public needsUserGesture(): boolean { return Boolean(this.getContext()) && !this.isReady(); }
+  public unlock(): void {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    void ctx.resume().then(() => { this.contextReady = ctx.state === "running"; }).catch(() => { this.contextReady = false; });
   }
   public getVolume(): number { return this.volume; }
   public setVolume(value: number): void {
@@ -62,11 +88,12 @@ class SoundEffectManager {
     if (this.vibrationEnabled && this.isVibrationSupported()) navigator.vibrate(pattern);
   }
 
-  private tone(type: OscillatorType, startFrequency: number, endFrequency: number, duration: number, amplitude: number): void {
-    if (!this.soundEnabled) return;
+  private tone(type: OscillatorType, startFrequency: number, endFrequency: number, duration: number, amplitude: number, categoryEnabled = true): void {
+    if (!this.soundEnabled || !categoryEnabled) return;
     const ctx = this.getContext();
     if (!ctx) return;
-    try {
+    const schedule = () => {
+      if (ctx.state !== "running") return;
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       const now = ctx.currentTime;
@@ -79,12 +106,27 @@ class SoundEffectManager {
       gain.connect(ctx.destination);
       osc.start(now);
       osc.stop(now + duration);
-    } catch {}
+      osc.addEventListener("ended", () => { osc.disconnect(); gain.disconnect(); }, { once: true });
+    };
+    if (ctx.state === "running") {
+      try { schedule(); } catch { /* Audio is best-effort and must not block room actions. */ }
+      return;
+    }
+    void ctx.resume().then(() => {
+      this.contextReady = ctx.state === "running";
+      if (this.contextReady) {
+        try { schedule(); } catch { /* Audio is best-effort and must not block room actions. */ }
+      }
+    }).catch(() => { this.contextReady = false; });
   }
 
-  public playJoin(): void { this.tone("sine", 440, 880, 0.25, 0.08); }
-  public playLeave(): void { this.tone("sine", 659.25, 329.63, 0.25, 0.08); }
-  public playMessage(): void { this.tone("sine", 587.33, 880, 0.15, 0.05); }
+  public playJoin(): void { this.tone("sine", 440, 880, 0.25, 0.08, this.participantEnabled); }
+  public playLeave(): void { this.tone("sine", 659.25, 329.63, 0.25, 0.08, this.participantEnabled); }
+  public playMessage(): void { this.tone("sine", 587.33, 880, 0.15, 0.05, this.chatEnabled); }
+  public playMicOn(): void { this.tone("triangle", 520, 760, 0.12, 0.05, this.microphoneEnabled); }
+  public playMicOff(): void { this.tone("triangle", 760, 420, 0.12, 0.05, this.microphoneEnabled); }
+  public playRemoteMicOn(): void { this.tone("sine", 700, 900, 0.1, 0.035, this.remoteMicrophoneEnabled); }
+  public playRemoteMicOff(): void { this.tone("sine", 500, 350, 0.1, 0.035, this.remoteMicrophoneEnabled); }
   public playReaction(): void { this.tone("triangle", 523.25, 783.99, 0.14, 0.04); }
 }
 

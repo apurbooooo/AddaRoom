@@ -121,6 +121,10 @@ export function RoomControlBar({
   const [soundOn, setSoundOn] = useState(soundManager.isEnabled());
   const [soundVolume, setSoundVolume] = useState(soundManager.getVolume());
   const [vibrationOn, setVibrationOn] = useState(soundManager.isVibrationEnabled());
+  const [chatSoundOn, setChatSoundOn] = useState(soundManager.isChatEnabled());
+  const [participantSoundOn, setParticipantSoundOn] = useState(soundManager.isParticipantEnabled());
+  const [microphoneSoundOn, setMicrophoneSoundOn] = useState(soundManager.isMicrophoneEnabled());
+  const [remoteMicrophoneSoundOn, setRemoteMicrophoneSoundOn] = useState(soundManager.isRemoteMicrophoneEnabled());
   const [mobileScreenShareWarning, setMobileScreenShareWarning] = useState<string | null>(null);
 
   const reactionsList = ["❤️", "😂", "👏", "😮", "👍", "🔥"];
@@ -128,6 +132,7 @@ export function RoomControlBar({
   const handleToggleSound = () => {
     const next = !soundOn;
     soundManager.setEnabled(next);
+    if (next) soundManager.unlock();
     setSoundOn(next);
   };
 
@@ -434,7 +439,11 @@ export function RoomControlBar({
                 </div>
                 <div className="rounded-xl border border-[#2a2a2a] bg-black p-3 space-y-2">
                   <div className="flex items-center justify-between"><span className="font-semibold text-white">Notification preferences</span><span className="text-[10px] text-gray-500">This device</span></div>
-                  <label className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={soundOn} onChange={handleToggleSound} className="accent-brand" /> Message sounds</label>
+                  <label className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={soundOn} onChange={handleToggleSound} className="accent-brand" /> Master sound</label>
+                  <label className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={chatSoundOn} onChange={(event) => { setChatSoundOn(event.target.checked); soundManager.setChatEnabled(event.target.checked); }} className="accent-brand" /> Chat notifications</label>
+                  <label className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={participantSoundOn} onChange={(event) => { setParticipantSoundOn(event.target.checked); soundManager.setParticipantEnabled(event.target.checked); }} className="accent-brand" /> Join / leave</label>
+                  <label className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={microphoneSoundOn} onChange={(event) => { setMicrophoneSoundOn(event.target.checked); soundManager.setMicrophoneEnabled(event.target.checked); }} className="accent-brand" /> Microphone feedback</label>
+                  <label className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={remoteMicrophoneSoundOn} onChange={(event) => { setRemoteMicrophoneSoundOn(event.target.checked); soundManager.setRemoteMicrophoneEnabled(event.target.checked); }} className="accent-brand" /> Remote mic changes</label>
                   <label className="block text-[10px] text-gray-400">Volume <input aria-label="Notification sound volume" type="range" min="0" max="1" step="0.05" value={soundVolume} onChange={(event) => { const value = Number(event.target.value); setSoundVolume(value); soundManager.setVolume(value); }} className="mt-1 w-full accent-brand" /></label>
                   <label className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={vibrationOn} onChange={handleToggleVibration} disabled={!soundManager.isVibrationSupported()} className="accent-brand" /> Vibration {soundManager.isVibrationSupported() ? "feedback" : "(unsupported)"}</label>
                 </div>

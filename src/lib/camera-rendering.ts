@@ -13,7 +13,8 @@ export function isRenderableCameraTrack(track: { source?: Track.Source; kind?: T
   return track?.source === Track.Source.Camera && track?.kind === Track.Kind.Video;
 }
 
-export function getCameraTransform(options: { isLocal: boolean; mirrorLocalPreview: boolean; source?: Track.Source }): string {
-  if (options.isLocal && options.mirrorLocalPreview && options.source === Track.Source.Camera) return "scaleX(-1)";
+export function getCameraTransform(options: { isLocal: boolean; mirrorLocalPreview?: boolean; source?: Track.Source }): string {
+  // Camera frames are rendered exactly as published. Mirroring the local tile
+  // also mirrors readable labels and controls overlaid on the video.
   return "none";
 }

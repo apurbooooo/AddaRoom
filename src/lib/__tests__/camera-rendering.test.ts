@@ -12,8 +12,9 @@ describe("camera rendering state", () => {
     expect(isRenderableCameraTrack({ source: Track.Source.ScreenShare, kind: Track.Kind.Video })).toBe(false);
   });
   it("does not mirror local preview by default", () => expect(getCameraTransform({ isLocal: true, mirrorLocalPreview: false, source: Track.Source.Camera })).toBe("none"));
-  it("mirrors only an explicitly opted-in local camera preview", () => expect(getCameraTransform({ isLocal: true, mirrorLocalPreview: true, source: Track.Source.Camera })).toBe("scaleX(-1)"));
-  it("never mirrors remote camera or screen share", () => {
+  it("ignores the legacy mirror flag for local camera previews", () => expect(getCameraTransform({ isLocal: true, mirrorLocalPreview: true, source: Track.Source.Camera })).toBe("none"));
+  it("never mirrors remote camera, local camera, or screen share", () => {
+    expect(getCameraTransform({ isLocal: true, mirrorLocalPreview: false, source: Track.Source.Camera })).toBe("none");
     expect(getCameraTransform({ isLocal: false, mirrorLocalPreview: true, source: Track.Source.Camera })).toBe("none");
     expect(getCameraTransform({ isLocal: true, mirrorLocalPreview: true, source: Track.Source.ScreenShare })).toBe("none");
   });
