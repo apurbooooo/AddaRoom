@@ -87,8 +87,8 @@ export function ChatPanel({
     const quickEmojis = ["❤️", "😂", "🔥", "🙌", "👀", "✨", "💯", "🎉"];
 
     const containerClasses = isEmbedded
-        ? `w-full h-full flex flex-col bg-[#0b0b0b] min-h-0 ${className}`
-        : `fixed inset-y-0 right-0 z-40 w-full sm:w-96 max-sm:inset-x-2 max-sm:top-auto max-sm:bottom-[calc(5.5rem+env(safe-area-inset-bottom))] max-sm:h-[min(70dvh,34rem)] max-sm:w-auto max-sm:rounded-2xl bg-[#111111] border-l border-[#2a2a2a] flex flex-col shadow-2xl transition-all duration-300 ${className}`;
+        ? `chat-panel w-full h-full flex flex-col bg-[#0b0b0b] min-h-0 ${className}`
+        : `chat-panel fixed inset-y-0 right-0 z-40 w-full sm:w-96 max-sm:inset-x-2 max-sm:top-auto max-sm:bottom-[calc(5.5rem+env(safe-area-inset-bottom))] max-sm:h-[min(70dvh,34rem)] max-sm:w-auto max-sm:rounded-2xl bg-[#111111] border-l border-[#2a2a2a] flex flex-col shadow-2xl transition-all duration-300 ${className}`;
 
     return (
         <div className={containerClasses}>

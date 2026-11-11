@@ -29,7 +29,7 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: "cover",
-  themeColor: "#000000",
+  themeColor: "#070A12",
 };
 
 export default function RootLayout({
@@ -39,7 +39,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className="min-h-screen bg-black text-white flex flex-col" suppressHydrationWarning>
+      <body className="min-h-screen bg-[#070A12] text-white flex flex-col" suppressHydrationWarning>
         {children}
       </body>
     </html>

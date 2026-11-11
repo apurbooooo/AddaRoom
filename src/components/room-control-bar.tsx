@@ -154,7 +154,7 @@ export function RoomControlBar({
   };
 
   return (
-    <footer className="relative bg-black/95 border-t border-[#2a2a2a] px-3 py-2.5 sm:px-6 sm:py-3 backdrop-blur-md select-none z-30"
+    <footer className="room-control-dock relative bg-black/95 border-t border-[#2a2a2a] px-3 py-2.5 sm:px-6 sm:py-3 backdrop-blur-md select-none z-30"
       style={{ paddingBottom: "calc(0.625rem + env(safe-area-inset-bottom, 0px))" }}
     >
       {/* Mobile Screen share warning toast */}

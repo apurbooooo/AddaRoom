@@ -32,7 +32,7 @@ export function RoomNotificationToast({ notifications, onDismiss, onOpenChat }: 
       {notifications.map((notification) => (
         <article
           key={notification.id}
-          className="pointer-events-auto animate-in slide-in-from-right-5 fade-in rounded-2xl border border-brand/25 border-l-2 border-l-brand/80 bg-[#0b0d0b]/95 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl duration-300"
+          className="room-notification pointer-events-auto animate-in slide-in-from-right-5 fade-in rounded-2xl border border-brand/25 border-l-2 border-l-brand/80 bg-[#0b0d0b]/95 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl duration-300"
         >
           <div className="flex items-start gap-3">
             <AvatarPortrait avatarId={notification.avatar || notification.senderName} size={40} className="shrink-0 rounded-xl ring-1 ring-brand/20" />
