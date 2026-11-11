@@ -76,7 +76,7 @@ export function InviteModal({ isOpen, onClose, roomCode, roomTitle }: InviteModa
         </button>
 
         <div className="flex items-center gap-2 mb-1">
-          <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+          <div className="p-2 rounded-xl bg-violet-500/10 text-violet-300 border border-violet-400/20">
             <Share2 className="w-5 h-5" />
           </div>
           <div>
@@ -111,7 +111,7 @@ export function InviteModal({ isOpen, onClose, roomCode, roomTitle }: InviteModa
             Room Code
           </label>
           <div className="flex items-center gap-2">
-            <div className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 font-mono text-sm tracking-widest text-indigo-300 font-bold">
+            <div className="flex-1 px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 font-mono text-sm tracking-widest text-violet-300 font-bold">
               {roomCode}
             </div>
             <button
@@ -138,7 +138,7 @@ export function InviteModal({ isOpen, onClose, roomCode, roomTitle }: InviteModa
             />
             <button
               onClick={handleCopyLink}
-              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-xl bg-violet-600 hover:bg-violet-500 text-white transition-colors"
             >
               {copiedLink ? <Check className="w-4 h-4 text-white" /> : <Copy className="w-4 h-4" />}
               {copiedLink ? "Copied Link" : "Copy Link"}

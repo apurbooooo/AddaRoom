@@ -187,7 +187,7 @@ export function RoomControlBar({
             }}
             className={`px-2.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1 transition-colors min-h-[44px] ${
               isHandRaised
-                ? "bg-amber-500 text-black font-bold"
+                ? "bg-violet-400 text-slate-950 font-bold"
                 : "bg-[#1a1a1a] hover:bg-[#2a2a2a] text-gray-200"
             }`}
           >
@@ -245,10 +245,10 @@ export function RoomControlBar({
           {isHost && (
             <button
               onClick={onOpenHostControls}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-semibold transition-colors min-h-[44px]"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-violet-500/10 hover:bg-violet-500/15 border border-violet-400/25 text-violet-200 text-xs font-semibold transition-colors min-h-[44px]"
               title="Host Controls"
             >
-              <Crown className="w-4 h-4 text-amber-400" />
+              <Crown className="w-4 h-4 text-violet-300" />
               <span className="hidden sm:inline">Host</span>
             </button>
           )}
@@ -370,7 +370,7 @@ export function RoomControlBar({
               disabled={!isScreenShareAllowed && !isScreenSharing}
               className={`p-3 rounded-l-2xl transition-all shadow-md min-w-[48px] min-h-[48px] flex items-center justify-center ${
                 isScreenSharing
-                  ? "bg-brand hover:bg-[#ceff44] text-black"
+                  ? "bg-brand hover:bg-cyan-300 text-black"
                   : "bg-[#1a1a1a] hover:bg-[#2a2a2a] text-gray-200 border border-[#2a2a2a]"
               }`}
               title={!isScreenShareAllowed ? "The host has disabled screen sharing" : isScreenSharing ? "Stop Screen Share" : "Share Screen"}
@@ -382,7 +382,7 @@ export function RoomControlBar({
               onClick={() => setShowQualityMenu((prev) => !prev)}
               className={`px-1.5 py-3 rounded-r-2xl border-l border-[#2a2a2a] shadow-md min-h-[48px] flex items-center justify-center ${
                 isScreenSharing
-                  ? "bg-[#a8e020] hover:bg-[#BBFB2B] text-black"
+                  ? "bg-cyan-200 hover:bg-cyan-100 text-slate-950"
                   : "bg-[#1a1a1a] hover:bg-[#2a2a2a] text-gray-400"
               }`}
               title="Screen Share Quality Settings"
@@ -424,7 +424,7 @@ export function RoomControlBar({
                     <span className="text-[10px] font-mono text-brand">{isMicEnabled ? `${micLevel}%` : "Muted"}</span>
                   </div>
                   <div className="h-2 overflow-hidden rounded-full bg-[#242424]" aria-label="Live microphone input level">
-                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-brand to-lime-200 transition-[width] duration-100" style={{ width: `${isMicEnabled ? micLevel : 0}%` }} />
+                    <div className="h-full rounded-full bg-gradient-to-r from-cyan-400 via-brand to-violet-500 transition-[width] duration-100" style={{ width: `${isMicEnabled ? micLevel : 0}%` }} />
                   </div>
                   {microphoneDevices.length > 0 && onSelectMicrophone && (
                     <label className="block text-[10px] text-gray-400">
@@ -464,7 +464,7 @@ export function RoomControlBar({
                         !isBrowserProcessingSupported
                           ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
                           : isNoiseEnabled
-                          ? "bg-brand text-black hover:bg-[#ceff44]"
+                          ? "bg-brand text-black hover:bg-cyan-300"
                           : "bg-[#1a1a1a] hover:bg-[#2a2a2a] text-gray-300 border border-[#333]"
                       }`}
                     >
@@ -502,7 +502,7 @@ export function RoomControlBar({
                           : krispState === "loading"
                           ? "bg-amber-500/20 text-amber-300 border border-amber-500/40 cursor-wait"
                           : krispState === "on"
-                          ? "bg-brand text-black hover:bg-[#ceff44]"
+                          ? "bg-brand text-black hover:bg-cyan-300"
                           : krispState === "failed"
                           ? "bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30"
                           : "bg-[#1a1a1a] hover:bg-[#2a2a2a] text-gray-300 border border-[#333]"
@@ -568,7 +568,7 @@ export function RoomControlBar({
             className="p-3 rounded-2xl bg-[#1a1a1a] hover:bg-[#2a2a2a] text-gray-200 border border-[#2a2a2a] shadow-md transition-colors min-w-[48px] min-h-[48px] flex items-center justify-center flex-shrink-0"
             title="Send Reaction"
           >
-            <Smile className="w-5 h-5 text-amber-300" />
+            <Smile className="w-5 h-5 text-violet-300" />
           </button>
         </div>
 
@@ -688,9 +688,9 @@ export function RoomControlBar({
           title="Reactions & Hand Raise"
           aria-label="Send reaction or raise hand"
         >
-          <Smile className="w-5 h-5 text-amber-300" />
+          <Smile className="w-5 h-5 text-violet-300" />
           {isHandRaised && (
-            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-amber-500 text-black text-[9px] font-bold flex items-center justify-center">
+            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-cyan-400 text-slate-950 text-[9px] font-bold flex items-center justify-center">
               ✋
             </span>
           )}
@@ -915,12 +915,12 @@ export function RoomControlBar({
                         setShowMobileMore(false);
                         onOpenHostControls();
                       }}
-                      className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center gap-2 text-left hover:bg-amber-500/20 transition-colors"
+                      className="p-3 rounded-2xl bg-violet-500/10 border border-violet-400/25 flex items-center gap-2 text-left hover:bg-violet-500/15 transition-colors"
                     >
-                      <Crown className="w-4 h-4 text-amber-400" />
+                      <Crown className="w-4 h-4 text-violet-300" />
                       <div>
-                        <p className="text-xs font-semibold text-amber-300">Host Menu</p>
-                        <p className="text-[10px] text-amber-400/80">Manage room</p>
+                        <p className="text-xs font-semibold text-violet-200">Host Menu</p>
+                        <p className="text-[10px] text-violet-300/80">Manage room</p>
                       </div>
                     </button>
                   )}

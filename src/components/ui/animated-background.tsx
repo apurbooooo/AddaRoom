@@ -19,8 +19,8 @@ export function AnimatedBackground({ variant = "rich", className = "", children 
   return (
     <div className={`cinematic-bg relative min-h-screen bg-black overflow-hidden ${className}`}>
       <div className={`cinematic-bg__layers pointer-events-none absolute inset-0 z-0 overflow-hidden select-none ${isRich ? "" : "cinematic-bg__layers--subtle"}`} aria-hidden="true">
-        <div className="cinematic-orb cinematic-orb--lime" />
-        <div className="cinematic-orb cinematic-orb--emerald" />
+        <div className="cinematic-orb cinematic-orb--cyan" />
+        <div className="cinematic-orb cinematic-orb--violet" />
         <div className="cinematic-orb cinematic-orb--breath" />
         <div className="cinematic-mesh" />
         <div className="cinematic-vignette" />

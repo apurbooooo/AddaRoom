@@ -900,7 +900,7 @@ export function RoomView({
                 setIsReconnecting(false);
                 setConnectionRetry((retry) => retry + 1);
               }}
-              className="px-4 py-2 rounded-xl bg-brand text-black text-xs font-bold hover:bg-[#ceff44] transition-colors"
+              className="px-4 py-2 rounded-xl bg-brand text-black text-xs font-bold hover:bg-cyan-300 transition-colors"
             >
               Retry Connection
             </button>
@@ -947,8 +947,8 @@ export function RoomView({
     <div className="room-shell relative h-[100dvh] min-h-0 w-full overflow-hidden bg-black text-white flex flex-col select-none">
       {/* Subtle ambient backdrop */}
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden select-none" aria-hidden="true">
-        <div className="absolute top-0 right-1/4 w-[500px] h-[300px] rounded-full bg-[radial-gradient(ellipse,rgba(187,251,43,0.02)_0%,transparent_70%)] blur-[100px]" />
-        <div className="absolute bottom-0 left-1/4 w-[600px] h-[300px] rounded-full bg-[radial-gradient(ellipse,rgba(16,185,129,0.015)_0%,transparent_70%)] blur-[120px]" />
+        <div className="room-ambient-glow room-ambient-glow--cyan absolute top-0 right-1/4 w-[500px] h-[300px] rounded-full blur-[100px]" />
+        <div className="room-ambient-glow room-ambient-glow--violet absolute bottom-0 left-1/4 w-[600px] h-[300px] rounded-full blur-[120px]" />
       </div>
 
       {/* Top Header Bar */}

@@ -295,7 +295,7 @@ export function PreJoinPreview({ displayName, roomTitle, onJoin, onCancel }: Pre
             )}
             <button
               onClick={handleJoin}
-              className="flex-1 py-3 rounded-xl bg-brand hover:bg-[#ceff44] text-black font-bold text-sm shadow-lg shadow-brand/25 transition-all min-h-[44px]"
+              className="flex-1 py-3 rounded-xl bg-brand hover:bg-cyan-300 text-black font-bold text-sm shadow-lg shadow-brand/25 transition-all min-h-[44px]"
             >
               Join Room
             </button>

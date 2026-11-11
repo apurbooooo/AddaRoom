@@ -4,8 +4,8 @@
   "description": "Your Circle. Your Room. Your Adda.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#070A12",
+  "theme_color": "#070A12",
   "orientation": "any",
   "scope": "/",
   "icons": [

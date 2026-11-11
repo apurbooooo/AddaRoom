@@ -190,8 +190,8 @@ export function ChatPanel({
 
             {/* Typing indicator */}
             {typingUsers.length > 0 && (
-                <div className="px-4 py-1 text-[11px] text-indigo-400 italic flex items-center gap-1.5 animate-pulse bg-slate-950/40 border-t border-slate-800/40">
-                    <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-ping" />
+                <div className="px-4 py-1 text-[11px] text-violet-400 italic flex items-center gap-1.5 animate-pulse bg-slate-950/40 border-t border-slate-800/40">
+                    <div className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-ping" />
                     <span>
                         {typingUsers.join(", ")} {typingUsers.length === 1 ? "is" : "are"} typing...
                     </span>
@@ -200,11 +200,11 @@ export function ChatPanel({
 
             {/* Replying banner */}
             {replyingTo && (
-                <div className="flex items-center justify-between px-3 py-1.5 bg-indigo-950/60 border-t border-indigo-900/60 text-xs text-indigo-200">
+                <div className="flex items-center justify-between px-3 py-1.5 bg-violet-950/60 border-t border-violet-900/60 text-xs text-violet-200">
                     <div className="flex items-center gap-1.5 truncate">
-                        <CornerDownRight className="w-3.5 h-3.5 text-indigo-400 flex-shrink-0" />
-                        <span className="font-semibold text-indigo-300">{replyingTo.senderName}:</span>
-                        <span className="truncate italic text-indigo-200">{replyingTo.text}</span>
+                        <CornerDownRight className="w-3.5 h-3.5 text-violet-400 flex-shrink-0" />
+                        <span className="font-semibold text-violet-300">{replyingTo.senderName}:</span>
+                        <span className="truncate italic text-violet-200">{replyingTo.text}</span>
                     </div>
                     <button onClick={() => setReplyingTo(null)} className="p-1 hover:text-white rounded">
                         <X className="w-3.5 h-3.5" />
@@ -252,7 +252,7 @@ export function ChatPanel({
                         type="button"
                         onClick={handleSend}
                         disabled={!inputText.trim()}
-                        className="min-w-11 min-h-11 grid place-items-center rounded-lg bg-brand hover:bg-[#ceff44] text-black disabled:opacity-40 disabled:hover:bg-brand transition-colors"
+                        className="min-w-11 min-h-11 grid place-items-center rounded-lg bg-brand hover:bg-cyan-300 text-black disabled:opacity-40 disabled:hover:bg-brand transition-colors"
                     >
                         <Send className="w-4 h-4" />
                     </button>

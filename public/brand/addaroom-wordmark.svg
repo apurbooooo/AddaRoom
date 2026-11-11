@@ -2,18 +2,17 @@
   <title id="title">AddaRoom</title>
   <desc id="desc">AddaRoom geometric conversation mark and wordmark.</desc>
   <defs>
-    <linearGradient id="lime" x1="10" y1="10" x2="78" y2="84" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#F4F7EF"/>
-      <stop offset=".58" stop-color="#BBFB2B"/>
-      <stop offset="1" stop-color="#54D98D"/>
+    <linearGradient id="brand-gradient" x1="10" y1="10" x2="120" y2="112" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#27DFFF"/>
+      <stop offset="1" stop-color="#A855F7"/>
     </linearGradient>
   </defs>
   <g transform="translate(4 4) scale(.69)">
-    <path d="M34 24h38c13.255 0 24 10.745 24 24v13c0 13.255-10.745 24-24 24H58l-16 14 3-14H34C20.745 85 10 74.255 10 61V48c0-13.255 10.745-24 24-24Z" fill="#07100A" stroke="url(#lime)" stroke-width="5"/>
-    <path d="M57 45h37c13.255 0 24 10.745 24 24v13c0 13.255-10.745 24-24 24H81l-15 13 3-13H57c-13.255 0-24-10.745-24-24V69c0-13.255-10.745-24 24-24Z" fill="#0B1A10" stroke="#BBFB2B" stroke-width="5" opacity=".95"/>
-    <path d="M52 58h10M52 70h24M52 82h15" stroke="#F4F7EF" stroke-width="5" stroke-linecap="round"/>
-    <circle cx="96" cy="20" r="7" fill="#BBFB2B"/><path d="M96 10v20M86 20h20" stroke="#000" stroke-width="3" stroke-linecap="round"/>
+    <path d="M34 24h38c13.255 0 24 10.745 24 24v13c0 13.255-10.745 24-24 24H58l-16 14 3-14H34C20.745 85 10 74.255 10 61V48c0-13.255 10.745-24 24-24Z" fill="#0D1220" stroke="#27DFFF" stroke-width="5"/>
+    <path d="M57 45h37c13.255 0 24 10.745 24 24v13c0 13.255-10.745 24-24 24H81l-15 13 3-13H57c-13.255 0-24-10.745-24-24V69c0-13.255 10.745-24 24-24Z" fill="#111827" stroke="url(#brand-gradient)" stroke-width="5" opacity=".98"/>
+    <path d="M52 58h10M52 70h24M52 82h15" stroke="#F1F5F9" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="96" cy="20" r="7" fill="#A855F7"/><path d="M96 10v20M86 20h20" stroke="#070A12" stroke-width="3" stroke-linecap="round"/>
   </g>
-  <text x="92" y="63" fill="#F4F7EF" font-family="Inter,Arial,sans-serif" font-size="42" font-weight="800" letter-spacing="-2">Adda</text>
-  <text x="207" y="63" fill="#BBFB2B" font-family="Inter,Arial,sans-serif" font-size="42" font-weight="800" letter-spacing="-2">Room</text>
+  <text x="92" y="63" fill="#F1F5F9" font-family="Inter,Arial,sans-serif" font-size="42" font-weight="800" letter-spacing="-2">Adda</text>
+  <text x="207" y="63" fill="#A855F7" font-family="Inter,Arial,sans-serif" font-size="42" font-weight="800" letter-spacing="-2">Room</text>
 </svg>
