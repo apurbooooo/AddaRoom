@@ -3,15 +3,17 @@
 import React, { useState, useEffect } from "react";
 import QRCode from "qrcode";
 import { Copy, Check, Share2, X, QrCode } from "lucide-react";
+import { soundManager } from "@/lib/sound-effects";
 
 interface InviteModalProps {
   isOpen: boolean;
   onClose: () => void;
   roomCode: string;
   roomTitle: string;
+  onCopied?: (kind: "link" | "code") => void;
 }
 
-export function InviteModal({ isOpen, onClose, roomCode, roomTitle }: InviteModalProps) {
+export function InviteModal({ isOpen, onClose, roomCode, roomTitle, onCopied }: InviteModalProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string>("");
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
@@ -39,16 +41,20 @@ export function InviteModal({ isOpen, onClose, roomCode, roomTitle }: InviteModa
 
   const handleCopyLink = async () => {
     try {
+      void soundManager.unlock();
       await navigator.clipboard.writeText(inviteUrl);
       setCopiedLink(true);
+      onCopied?.("link");
       setTimeout(() => setCopiedLink(false), 2000);
     } catch {}
   };
 
   const handleCopyCode = async () => {
     try {
+      void soundManager.unlock();
       await navigator.clipboard.writeText(roomCode);
       setCopiedCode(true);
+      onCopied?.("code");
       setTimeout(() => setCopiedCode(false), 2000);
     } catch {}
   };

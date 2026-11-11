@@ -17,7 +17,7 @@ async function authenticate(code: string, participantId: string, sessionSecret: 
 async function presentSnapshot(snapshot: Awaited<ReturnType<typeof mediaQueueStore.getSnapshot>>) {
   const items = await Promise.all(snapshot.items.map(async (item) => {
     const owner = await roomStore.getParticipantById(item.ownerParticipantId);
-    return { ...item, addedBy: item.ownerParticipantId, addedByName: owner?.displayName || item.ownerParticipantId, avatar: owner?.avatar || "👋" };
+    return { ...item, addedBy: item.ownerParticipantId, addedByName: owner?.displayName || "A participant", avatar: owner?.avatar || "persona-male-pfp" };
   }));
   return { ...snapshot, items };
 }

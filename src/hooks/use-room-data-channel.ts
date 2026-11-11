@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback, useRef } from "react";
-import { Room, RoomEvent } from "livekit-client";
+import { Participant, Room, RoomEvent } from "livekit-client";
 import {
   ChatMessagePacket,
   ReactionPacket,
@@ -11,6 +11,7 @@ import {
   LiveKitDataPacket,
 } from "@/types";
 import { soundManager } from "@/lib/sound-effects";
+import type { RoomEventNotice } from "@/lib/room-notifications";
 
 export interface ActiveReactionItem extends ReactionPacket {
   id: string;
@@ -78,6 +79,7 @@ export function useRoomDataChannel(
   currentParticipantName: string,
   currentAvatar: string,
   authorizedHostId?: string,
+  onRoomEvent?: (event: RoomEventNotice) => void,
 ) {
   const [messages, setMessages] = useState<ChatMessagePacket[]>([]);
   const [typingUsers, setTypingUsers] = useState<Map<string, string>>(new Map());
@@ -89,11 +91,12 @@ export function useRoomDataChannel(
   const typingTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const seenMessageIds = useRef<Set<string>>(new Set());
   const seenReactionIds = useRef<Set<string>>(new Set());
+  const seenHandEventIds = useRef<Set<string>>(new Set());
+  const reactionTimeouts = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const onRoomEventRef = useRef(onRoomEvent);
+  onRoomEventRef.current = onRoomEvent;
 
-  const notifyIncomingMessage = () => {
-    soundManager.playMessage();
-    soundManager.vibrate(35);
-  };
+  const notifyRoomEvent = (event: RoomEventNotice) => onRoomEventRef.current?.(event);
 
   // Handle incoming data packets
   useEffect(() => {
@@ -101,7 +104,7 @@ export function useRoomDataChannel(
 
     const handleDataReceived = (
       payload: Uint8Array,
-      participant?: { identity?: string } | null,
+      participant?: Participant | null,
       _kind?: unknown,
       topic?: string,
       _encryptionType?: unknown,
@@ -121,20 +124,56 @@ export function useRoomDataChannel(
               if (oldest) seenMessageIds.current.delete(oldest);
             }
             setMessages((prev) => [...prev, data]);
-            if (data.senderId !== currentParticipantId) {
-              notifyIncomingMessage();
+            const messageIsRecent = Number.isFinite(data.timestamp) && Date.now() - data.timestamp <= 60_000 && data.timestamp - Date.now() <= 30_000;
+            if (data.senderId !== currentParticipantId && messageIsRecent) {
+              notifyRoomEvent({
+                id: `chat:${data.id}`,
+                type: "chat",
+                scope: "remote",
+                participantId: data.senderId,
+                senderName: data.senderName || "A participant",
+                avatar: data.avatar,
+                text: data.text,
+                sound: "messageIncoming",
+                soundCategory: "chat",
+                vibrationCategory: "chat",
+                vibrationPattern: 28,
+              });
             }
             break;
           }
           case "reaction": {
             if (seenReactionIds.current.has(data.id)) break;
             seenReactionIds.current.add(data.id);
+            if (seenReactionIds.current.size > 600) {
+              const oldest = seenReactionIds.current.values().next().value;
+              if (oldest) seenReactionIds.current.delete(oldest);
+            }
             setActiveReactions((prev) => [...prev.slice(-30), data]);
-            if (data.senderId !== currentParticipantId) soundManager.playReaction();
+            const reactionIsRecent = Number.isFinite(data.timestamp) && Date.now() - data.timestamp <= 15_000 && data.timestamp - Date.now() <= 10_000;
+            if (data.senderId !== currentParticipantId && reactionIsRecent) {
+              notifyRoomEvent({
+                id: `reaction:${data.id}`,
+                type: "reaction",
+                scope: "remote",
+                participantId: data.senderId,
+                senderName: data.senderName || "A participant",
+                avatar: "",
+                text: `reacted ${data.emoji}`,
+                sound: "reaction",
+                soundCategory: "reactions",
+                vibrationCategory: "reactions",
+                vibrationPattern: 18,
+                durationMs: 3200,
+              });
+            }
             // Automatically clean up reaction after 3.5s
-            setTimeout(() => {
+            const existingTimeout = reactionTimeouts.current.get(data.id);
+            if (existingTimeout) clearTimeout(existingTimeout);
+            reactionTimeouts.current.set(data.id, setTimeout(() => {
+              reactionTimeouts.current.delete(data.id);
               setActiveReactions((prev) => prev.filter((r) => r.id !== data.id));
-            }, 3500);
+            }, 3500));
             break;
           }
           case "typing": {
@@ -165,6 +204,30 @@ export function useRoomDataChannel(
             break;
           }
           case "hand_raise": {
+            const handIsRecent = !data.timestamp || Date.now() - data.timestamp <= 60_000 && data.timestamp - Date.now() <= 30_000;
+            if (data.senderId !== currentParticipantId && handIsRecent) {
+              const eventId = data.id || `${data.senderId}:${data.isRaised ? "raised" : "lowered"}:${data.timestamp || 0}`;
+              if (!seenHandEventIds.current.has(eventId)) {
+                seenHandEventIds.current.add(eventId);
+                if (seenHandEventIds.current.size > 300) {
+                  const oldest = seenHandEventIds.current.values().next().value;
+                  if (oldest) seenHandEventIds.current.delete(oldest);
+                }
+                notifyRoomEvent({
+                  id: `hand:${eventId}`,
+                  type: data.isRaised ? "hand_raise" : "hand_lower",
+                  scope: "remote",
+                  participantId: data.senderId,
+                  senderName: data.senderName || "A participant",
+                  avatar: "",
+                  text: data.isRaised ? "raised their hand ✋" : "lowered their hand",
+                  sound: data.isRaised ? "handRaised" : "handLowered",
+                  soundCategory: "handRaise",
+                  vibrationCategory: "handRaise",
+                  vibrationPattern: data.isRaised ? 28 : 16,
+                });
+              }
+            }
             setRaisedHands((prev) => {
               const next = new Set(prev);
               if (data.isRaised) {
@@ -190,6 +253,94 @@ export function useRoomDataChannel(
             if (data.action === "room_ended") {
               setEnded(true);
             }
+            const actorName = participant?.name?.trim() || "Host";
+            const avatar = (() => {
+              try {
+                const id = participant?.metadata ? JSON.parse(participant.metadata).avatar : undefined;
+                return typeof id === "string" && id ? id : "persona-male-pfp";
+              } catch { return "persona-male-pfp"; }
+            })();
+            if (data.action === "lock_state" && typeof data.payload?.locked === "boolean") {
+              notifyRoomEvent({
+                id: `host:${participant?.identity || "server"}:lock:${data.payload.locked}:${data.payload.eventId || data.payload.timestamp || "state"}`,
+                type: data.payload.locked ? "room_lock" : "room_unlock",
+                scope: "room",
+                participantId: participant?.identity,
+                senderName: actorName,
+                avatar,
+                text: data.payload.locked ? "locked the room" : "unlocked the room",
+                sound: "roomAction",
+                soundCategory: "roomActions",
+                vibrationCategory: "roomEvents",
+              });
+            } else if (data.action === "mute") {
+              const muted = Boolean(data.payload?.muted);
+              const targetName = typeof data.payload?.targetName === "string" && data.payload.targetName.trim() ? data.payload.targetName.trim().slice(0, 60) : "a participant";
+              notifyRoomEvent({
+                id: `host:${participant?.identity || "server"}:mute:${data.targetParticipantId || "participant"}:${muted}:${data.payload?.eventId || data.payload?.timestamp || Date.now()}`,
+                type: muted ? "host_mute" : "host_unmute",
+                scope: "room",
+                participantId: participant?.identity,
+                senderName: actorName,
+                avatar,
+                text: muted ? `muted ${targetName}'s microphone` : `allowed ${targetName} to use their microphone`,
+                sound: "roomAction",
+                soundCategory: "roomActions",
+                vibrationCategory: "roomEvents",
+              });
+            } else if (data.action === "kick") {
+              const targetName = typeof data.payload?.targetName === "string" && data.payload.targetName.trim() ? data.payload.targetName.trim().slice(0, 60) : "a participant";
+              notifyRoomEvent({
+                id: `host:${participant?.identity || "server"}:remove:${data.targetParticipantId || "participant"}:${data.payload?.eventId || data.payload?.timestamp || Date.now()}`,
+                type: "host_remove",
+                scope: "room",
+                participantId: participant?.identity,
+                senderName: actorName,
+                avatar,
+                text: `removed ${targetName} from the room`,
+                sound: "roomAction",
+                soundCategory: "roomActions",
+                vibrationCategory: "roomEvents",
+              });
+            } else if (data.action === "host_transferred") {
+              notifyRoomEvent({
+                id: `host:${participant?.identity || "server"}:transfer:${data.targetParticipantId || "host"}:${data.payload?.eventId || data.payload?.timestamp || Date.now()}`,
+                type: "host_transfer",
+                scope: "room",
+                participantId: participant?.identity,
+                senderName: actorName,
+                avatar,
+                text: "transferred host privileges",
+                sound: "roomAction",
+                soundCategory: "roomActions",
+              });
+            } else if (data.action === "room_setting") {
+              notifyRoomEvent({
+                id: `host:${participant?.identity || "server"}:setting:${data.payload?.eventId || data.payload?.timestamp || Date.now()}`,
+                type: "room_setting",
+                scope: "room",
+                participantId: participant?.identity,
+                senderName: actorName,
+                avatar,
+                text: "updated room settings",
+                sound: "roomAction",
+                soundCategory: "roomActions",
+                vibrationCategory: "roomEvents",
+              });
+            } else if (data.action === "room_ended") {
+              notifyRoomEvent({
+                id: `host:${participant?.identity || "server"}:ended:${data.payload?.eventId || data.payload?.timestamp || Date.now()}`,
+                type: "room_setting",
+                scope: "room",
+                participantId: participant?.identity,
+                senderName: actorName,
+                avatar,
+                text: "ended the room",
+                sound: "roomAction",
+                soundCategory: "roomActions",
+                vibrationCategory: "roomEvents",
+              });
+            }
             break;
           }
         }
@@ -204,8 +355,8 @@ export function useRoomDataChannel(
       room.off(RoomEvent.DataReceived, handleDataReceived);
       typingTimeouts.current.forEach((t) => clearTimeout(t));
       typingTimeouts.current.clear();
-      seenMessageIds.current.clear();
-      seenReactionIds.current.clear();
+      reactionTimeouts.current.forEach((t) => clearTimeout(t));
+      reactionTimeouts.current.clear();
     };
   }, [room, currentParticipantId, authorizedHostId]);
 
@@ -219,8 +370,10 @@ export function useRoomDataChannel(
         await room.localParticipant.publishData(payload, {
           reliable,
         });
+        return true;
       } catch (err) {
         console.error("Failed to publish data packet:", err);
+        return false;
       }
     },
     [room]
@@ -230,6 +383,7 @@ export function useRoomDataChannel(
     async (text: string, replyTo?: ChatMessagePacket["replyTo"]) => {
       const clean = text.trim();
       if (!clean) return;
+      void soundManager.unlock();
 
       const packet: ChatMessagePacket = {
         type: "chat",
@@ -246,13 +400,15 @@ export function useRoomDataChannel(
       seenMessageIds.current.add(packet.id);
       setMessages((prev) => [...prev, packet]);
       // Publish to other room participants reliably
-      await publishPacket(packet, true);
+      const published = await publishPacket(packet, true);
+      if (published) soundManager.playMessageSent(`message-sent:${packet.id}`);
     },
     [currentParticipantId, currentParticipantName, currentAvatar, publishPacket]
   );
 
   const sendReaction = useCallback(
     async (emoji: string) => {
+      void soundManager.unlock();
       const packet: ReactionPacket = {
         type: "reaction",
         id: `rx_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -264,14 +420,29 @@ export function useRoomDataChannel(
 
       seenReactionIds.current.add(packet.id);
       setActiveReactions((prev) => [...prev.slice(-30), packet]);
-      soundManager.playReaction();
-      setTimeout(() => {
+      const reactionTimeout = setTimeout(() => {
+        reactionTimeouts.current.delete(packet.id);
         setActiveReactions((prev) => prev.filter((r) => r.id !== packet.id));
       }, 3500);
+      reactionTimeouts.current.set(packet.id, reactionTimeout);
 
-      await publishPacket(packet, false); // loss-tolerant low-latency
+      const published = await publishPacket(packet, false); // loss-tolerant low-latency
+      if (published) {
+        soundManager.playReaction(`reaction:${packet.id}`);
+        soundManager.vibrate("reactions", 18);
+        notifyRoomEvent({
+          id: `reaction:${packet.id}`,
+          type: "reaction",
+          scope: "local",
+          participantId: currentParticipantId,
+          senderName: "You",
+          avatar: currentAvatar,
+          text: `reacted ${emoji}`,
+          durationMs: 3000,
+        });
+      }
     },
-    [currentParticipantId, currentParticipantName, publishPacket]
+    [currentParticipantId, currentParticipantName, currentAvatar, publishPacket]
   );
 
   const sendTyping = useCallback(
@@ -289,6 +460,7 @@ export function useRoomDataChannel(
 
   const toggleHandRaise = useCallback(
     async (isCurrentlyRaised: boolean) => {
+      void soundManager.unlock();
       const nextRaised = !isCurrentlyRaised;
       setRaisedHands((prev) => {
         const next = new Set(prev);
@@ -299,21 +471,37 @@ export function useRoomDataChannel(
 
       const packet: HandRaisePacket = {
         type: "hand_raise",
+        id: `hand_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
         senderId: currentParticipantId,
         senderName: currentParticipantName,
         isRaised: nextRaised,
+        timestamp: Date.now(),
       };
-      await publishPacket(packet, true);
+      const published = await publishPacket(packet, true);
+      if (published) {
+        soundManager.playOnce(`hand:${packet.id}`, nextRaised ? "handRaised" : "handLowered");
+        soundManager.vibrate("handRaise", nextRaised ? 28 : 16);
+        notifyRoomEvent({
+          id: `hand:${packet.id}`,
+          type: nextRaised ? "hand_raise" : "hand_lower",
+          scope: "local",
+          participantId: currentParticipantId,
+          senderName: "You",
+          avatar: currentAvatar,
+          text: nextRaised ? "raised your hand ✋" : "lowered your hand",
+        });
+      }
     },
-    [currentParticipantId, currentParticipantName, publishPacket]
+    [currentParticipantId, currentParticipantName, currentAvatar, publishPacket]
   );
 
   const sendHostBroadcast = useCallback(
-    async (action: HostCommandPacket["action"], targetParticipantId?: string) => {
+    async (action: HostCommandPacket["action"], targetParticipantId?: string, payload?: HostCommandPacket["payload"]) => {
       const packet: HostCommandPacket = {
         type: "host_command",
         action,
         targetParticipantId,
+        payload,
       };
       await publishPacket(packet, true);
     },

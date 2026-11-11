@@ -29,9 +29,32 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import { ScreenShareQualityMode } from "@/types";
-import { soundManager } from "@/lib/sound-effects";
+import { soundManager, type SoundCategory, type VibrationCategory } from "@/lib/sound-effects";
 import { isScreenShareSupported } from "@/lib/media-constraints";
 import type { KrispState } from "@/hooks/use-noise-filter";
+
+const SOUND_CATEGORY_CONTROLS: { key: SoundCategory; label: string }[] = [
+  { key: "chat", label: "Chat messages" },
+  { key: "reactions", label: "Reactions" },
+  { key: "handRaise", label: "Raise hand" },
+  { key: "microphone", label: "Your microphone" },
+  { key: "remoteMicrophone", label: "Other participants’ microphones" },
+  { key: "camera", label: "Camera changes" },
+  { key: "participants", label: "Participant join / leave" },
+  { key: "screenShare", label: "Screen sharing" },
+  { key: "roomActions", label: "Room and host actions" },
+  { key: "mediaQueue", label: "Media queue and playback" },
+];
+
+const VIBRATION_CATEGORY_CONTROLS: { key: VibrationCategory; label: string }[] = [
+  { key: "chat", label: "Chat messages" },
+  { key: "reactions", label: "Reactions" },
+  { key: "handRaise", label: "Raise hand" },
+  { key: "microphone", label: "Microphone changes" },
+  { key: "camera", label: "Camera changes" },
+  { key: "participants", label: "Participant join / leave" },
+  { key: "roomEvents", label: "Important room events" },
+];
 
 interface RoomControlBarProps {
   isMicEnabled: boolean;
@@ -121,10 +144,9 @@ export function RoomControlBar({
   const [soundOn, setSoundOn] = useState(soundManager.isEnabled());
   const [soundVolume, setSoundVolume] = useState(soundManager.getVolume());
   const [vibrationOn, setVibrationOn] = useState(soundManager.isVibrationEnabled());
-  const [chatSoundOn, setChatSoundOn] = useState(soundManager.isChatEnabled());
-  const [participantSoundOn, setParticipantSoundOn] = useState(soundManager.isParticipantEnabled());
-  const [microphoneSoundOn, setMicrophoneSoundOn] = useState(soundManager.isMicrophoneEnabled());
-  const [remoteMicrophoneSoundOn, setRemoteMicrophoneSoundOn] = useState(soundManager.isRemoteMicrophoneEnabled());
+  const [soundReady, setSoundReady] = useState(soundManager.isReady());
+  const [soundCategories, setSoundCategories] = useState(() => soundManager.getSoundCategories());
+  const [vibrationCategories, setVibrationCategories] = useState(() => soundManager.getVibrationCategories());
   const [mobileScreenShareWarning, setMobileScreenShareWarning] = useState<string | null>(null);
 
   const reactionsList = ["❤️", "😂", "👏", "😮", "👍", "🔥"];
@@ -132,7 +154,7 @@ export function RoomControlBar({
   const handleToggleSound = () => {
     const next = !soundOn;
     soundManager.setEnabled(next);
-    if (next) soundManager.unlock();
+    if (next) void soundManager.unlock().then(setSoundReady);
     setSoundOn(next);
   };
 
@@ -140,6 +162,27 @@ export function RoomControlBar({
     const next = !vibrationOn;
     soundManager.setVibrationEnabled(next);
     setVibrationOn(next);
+  };
+
+  const handleSoundCategoryChange = (category: SoundCategory, enabled: boolean) => {
+    soundManager.setCategoryEnabled(category, enabled);
+    setSoundCategories((previous) => ({ ...previous, [category]: enabled }));
+  };
+
+  const handleVibrationCategoryChange = (category: VibrationCategory, enabled: boolean) => {
+    soundManager.setVibrationCategoryEnabled(category, enabled);
+    setVibrationCategories((previous) => ({ ...previous, [category]: enabled }));
+  };
+
+  const handleEnableSound = async () => {
+    const unlocked = await soundManager.unlock();
+    setSoundReady(unlocked);
+  };
+
+  const handleTestSound = async () => {
+    const unlocked = soundManager.isReady() || await soundManager.unlock();
+    setSoundReady(unlocked);
+    if (unlocked) soundManager.playTest();
   };
 
   const handleScreenShareClick = () => {
@@ -437,15 +480,26 @@ export function RoomControlBar({
                   )}
                   {!isMicEnabled && <p className="text-[10px] text-gray-500">Turn on your microphone to see live input.</p>}
                 </div>
-                <div className="rounded-xl border border-[#2a2a2a] bg-black p-3 space-y-2">
-                  <div className="flex items-center justify-between"><span className="font-semibold text-white">Notification preferences</span><span className="text-[10px] text-gray-500">This device</span></div>
-                  <label className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={soundOn} onChange={handleToggleSound} className="accent-brand" /> Master sound</label>
-                  <label className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={chatSoundOn} onChange={(event) => { setChatSoundOn(event.target.checked); soundManager.setChatEnabled(event.target.checked); }} className="accent-brand" /> Chat notifications</label>
-                  <label className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={participantSoundOn} onChange={(event) => { setParticipantSoundOn(event.target.checked); soundManager.setParticipantEnabled(event.target.checked); }} className="accent-brand" /> Join / leave</label>
-                  <label className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={microphoneSoundOn} onChange={(event) => { setMicrophoneSoundOn(event.target.checked); soundManager.setMicrophoneEnabled(event.target.checked); }} className="accent-brand" /> Microphone feedback</label>
-                  <label className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={remoteMicrophoneSoundOn} onChange={(event) => { setRemoteMicrophoneSoundOn(event.target.checked); soundManager.setRemoteMicrophoneEnabled(event.target.checked); }} className="accent-brand" /> Remote mic changes</label>
-                  <label className="block text-[10px] text-gray-400">Volume <input aria-label="Notification sound volume" type="range" min="0" max="1" step="0.05" value={soundVolume} onChange={(event) => { const value = Number(event.target.value); setSoundVolume(value); soundManager.setVolume(value); }} className="mt-1 w-full accent-brand" /></label>
-                  <label className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={vibrationOn} onChange={handleToggleVibration} disabled={!soundManager.isVibrationSupported()} className="accent-brand" /> Vibration {soundManager.isVibrationSupported() ? "feedback" : "(unsupported)"}</label>
+                <div className="rounded-xl border border-[#2a2a2a] bg-black p-3 space-y-3 max-h-[min(65vh,34rem)] overflow-y-auto">
+                  <div className="flex items-center justify-between"><span className="font-semibold text-white">Sound &amp; notification settings</span><span className="text-[10px] text-gray-500">This device</span></div>
+                  <section className="space-y-2" aria-label="Master sound settings">
+                    <label className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={soundOn} onChange={handleToggleSound} className="accent-brand" /> Master sound</label>
+                    {soundOn && !soundReady && soundManager.needsUserGesture() && <button type="button" onClick={() => void handleEnableSound()} className="w-full rounded-lg border border-brand/25 bg-brand/10 px-3 py-2 text-left text-[11px] font-semibold text-brand hover:bg-brand/15">Enable sound for this browser</button>}
+                    <button type="button" onClick={() => void handleTestSound()} disabled={!soundOn} className="w-full rounded-lg border border-violet-400/20 bg-violet-500/10 px-3 py-2 text-[11px] font-semibold text-violet-200 hover:bg-violet-500/15 disabled:opacity-40">Test sound</button>
+                    <label className="block text-[10px] text-gray-400">Notification volume <input aria-label="Notification sound volume" type="range" min="0" max="1" step="0.05" value={soundVolume} onChange={(event) => { const value = Number(event.target.value); setSoundVolume(value); soundManager.setVolume(value); }} className="mt-1 w-full accent-brand" /></label>
+                  </section>
+                  <fieldset disabled={!soundOn} className="space-y-1.5 border-t border-white/10 pt-2 disabled:opacity-45">
+                    <legend className="pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Sound categories</legend>
+                    {SOUND_CATEGORY_CONTROLS.map(({ key, label }) => <label key={key} className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={soundCategories[key]} onChange={(event) => handleSoundCategoryChange(key, event.target.checked)} className="accent-brand" />{label}</label>)}
+                  </fieldset>
+                  <section className="space-y-1.5 border-t border-white/10 pt-2" aria-label="Master vibration settings">
+                    <label className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={vibrationOn} onChange={handleToggleVibration} disabled={!soundManager.isVibrationSupported()} className="accent-brand" /> Master vibration</label>
+                    <p className="text-[10px] text-gray-500">{soundManager.isVibrationSupported() ? "Vibration is supported in this browser." : "Vibration is not supported in this browser."}</p>
+                  </section>
+                  <fieldset disabled={!vibrationOn || !soundManager.isVibrationSupported()} className="space-y-1.5 border-t border-white/10 pt-2 disabled:opacity-45">
+                    <legend className="pb-1 text-[10px] font-semibold uppercase tracking-wide text-gray-400">Vibration categories</legend>
+                    {VIBRATION_CATEGORY_CONTROLS.map(({ key, label }) => <label key={key} className="flex items-center gap-2 text-[11px] text-gray-300"><input type="checkbox" checked={vibrationCategories[key]} onChange={(event) => handleVibrationCategoryChange(key, event.target.checked)} className="accent-brand" />{label}</label>)}
+                  </fieldset>
                 </div>
                 {/* Setting 1: WebRTC Native Browser Noise Suppression */}
                 <div className="p-3 rounded-xl bg-black border border-[#2a2a2a] space-y-2">

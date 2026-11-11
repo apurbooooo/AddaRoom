@@ -103,14 +103,16 @@ export interface TypingPacket {
 
 export interface HandRaisePacket {
   type: "hand_raise";
+  id?: string;
   senderId: string;
   senderName: string;
   isRaised: boolean;
+  timestamp?: number;
 }
 
 export interface HostCommandPacket {
   type: "host_command";
-  action: "kick" | "mute" | "lock_state" | "room_ended" | "host_transferred";
+  action: "kick" | "mute" | "lock_state" | "room_ended" | "host_transferred" | "room_setting";
   targetParticipantId?: string;
   payload?: any;
 }

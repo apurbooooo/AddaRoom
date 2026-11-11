@@ -35,9 +35,10 @@ import { useMicrophoneMonitor } from "@/hooks/use-microphone-monitor";
 import { createRoomConnectionAttempt } from "@/lib/room-connection-lifecycle";
 import { clearRoomSession } from "@/lib/session-storage";
 import { soundManager } from "@/lib/sound-effects";
+import { DEFAULT_AVATAR_ID } from "@/lib/avatar-catalog";
 import { selectIncomingMessages } from "@/lib/chat-notifications";
-import { RoomNotificationToast, RoomNotification } from "@/components/room/room-notification-toast";
-import { capRoomNotifications, getRoomNotificationExpiry } from "@/lib/room-notifications";
+import { RoomNotificationToast } from "@/components/room/room-notification-toast";
+import { acceptRoomNotificationEvent, capRoomNotifications, createRoomNotification, type RoomEventNotice, type RoomNotification } from "@/lib/room-notifications";
 import {
   Loader2,
   AlertTriangle,
@@ -61,6 +62,19 @@ interface RoomViewProps {
 }
 
 type RoomConnectionStage = "preparing" | "connecting" | "connected" | "reconnecting" | "failed";
+
+function participantAvatar(participant?: Participant): string {
+  try {
+    const value = participant?.metadata ? JSON.parse(participant.metadata).avatar : undefined;
+    return typeof value === "string" && value ? value : DEFAULT_AVATAR_ID;
+  } catch {
+    return DEFAULT_AVATAR_ID;
+  }
+}
+
+function participantDisplayName(participant?: Participant): string {
+  return participant?.name?.trim() || "A participant";
+}
 
 /** Browser-level audio constraints for best quality and noise reduction */
 const MIC_CAPTURE_OPTIONS: AudioCaptureOptions = {
@@ -117,8 +131,13 @@ export function RoomView({
   const [unreadCount, setUnreadCount] = useState(0);
   const [roomNotifications, setRoomNotifications] = useState<RoomNotification[]>([]);
   const notifiedMessageIds = useRef<Set<string>>(new Set());
-  const notifiedParticipantEvents = useRef<Set<string>>(new Set());
-  const notifiedRemoteMicEvents = useRef<Set<string>>(new Set());
+  const notifiedRoomEventIds = useRef<Set<string>>(new Set());
+  const participantPresence = useRef(new Set<string>());
+  const participantEventVersions = useRef(new Map<string, number>());
+  const trackStates = useRef(new Map<string, boolean>());
+  const trackEventVersions = useRef(new Map<string, number>());
+  const isChatOpenRef = useRef(isChatOpen);
+  isChatOpenRef.current = isChatOpen;
   const [screenAudioAvailable, setScreenAudioAvailable] = useState<boolean | null>(null);
   const [fullscreenFallbackNotice, setFullscreenFallbackNotice] = useState(false);
   const [isInviteOpen, setIsInviteOpen] = useState(false);
@@ -128,6 +147,17 @@ export function RoomView({
 
   // Hand raised status
   const [isHandRaised, setIsHandRaised] = useState(false);
+
+  const notifyRoomEvent = useCallback((event: RoomEventNotice) => {
+    if (!acceptRoomNotificationEvent(event.id, notifiedRoomEventIds.current)) return;
+    if (event.sound) soundManager.playOnce(event.id, event.sound);
+    if (event.vibrationCategory) soundManager.vibrate(event.vibrationCategory, event.vibrationPattern);
+    if (event.type === "chat" && isChatOpenRef.current) return;
+    setRoomNotifications((previous) => capRoomNotifications([
+      ...previous,
+      createRoomNotification({ ...event, avatar: event.avatar || "persona-male-pfp" }),
+    ]));
+  }, []);
 
   // Free-tier usage monitoring
   const [sessionDurationSeconds, setSessionDurationSeconds] = useState(0);
@@ -193,6 +223,7 @@ export function RoomView({
     session.displayName,
     session.avatar,
     verifiedHostId,
+    notifyRoomEvent,
   );
 
   const isHost = session.role === "host";
@@ -204,6 +235,7 @@ export function RoomView({
     hostParticipantId,
     roomCode,
     sessionSecret: session.sessionSecret,
+    onRoomEvent: notifyRoomEvent,
   });
 
   // Keep unread state and an in-room toast up-to-date without replaying the
@@ -218,19 +250,7 @@ export function RoomView({
     }
     if (isChatOpen) return;
     setUnreadCount((prev) => prev + newRemoteMessages.length);
-    setRoomNotifications((previous) =>
-      capRoomNotifications([
-        ...previous,
-        ...newRemoteMessages.map((message) => ({
-          id: `chat:${message.id}`,
-          kind: "chat" as const,
-          senderName: message.senderName,
-          avatar: message.avatar,
-          text: message.text,
-          expiresAt: getRoomNotificationExpiry(),
-        })),
-      ]),
-    );
+    // Popups and incoming sounds are emitted from the DataChannel event pipeline.
   }, [messages, isChatOpen, session.participantId]);
 
   useEffect(() => {
@@ -294,7 +314,10 @@ export function RoomView({
   // connection inputs and explicit retry counter, never on Room-derived state.
   useEffect(() => {
     let active = true;
+    let roomStateReady = false;
     const attemptId = ++connectionAttemptRef.current;
+    participantPresence.current.clear();
+    trackStates.current.clear();
     const lkRoom = new Room({
       adaptiveStream: true,
       dynacast: true,
@@ -313,6 +336,77 @@ export function RoomView({
     const updateRemotes = () => {
       if (active) setRemoteParticipants(Array.from(lkRoom.remoteParticipants.values()));
     };
+    const rememberParticipant = (participant: Participant) => {
+      const sources = [Track.Source.Microphone, Track.Source.Camera, Track.Source.ScreenShare];
+      for (const source of sources) {
+        const publication = participant.getTrackPublication(source);
+        trackStates.current.set(`${participant.identity}:${source}`, Boolean(publication?.track && !publication.isMuted));
+      }
+    };
+    const rememberRoomState = () => {
+      const participants = [lkRoom.localParticipant, ...lkRoom.remoteParticipants.values()];
+      for (const participant of participants) {
+        rememberParticipant(participant);
+        if (participant !== lkRoom.localParticipant) participantPresence.current.add(participant.identity);
+      }
+    };
+    const emitTrackState = (publication: any, participant: Participant | undefined, enabled: boolean) => {
+      if (!participant) return;
+      const source = publication.source;
+      if (source !== Track.Source.Microphone && source !== Track.Source.Camera && source !== Track.Source.ScreenShare) return;
+      const local = participant.identity === session.participantId;
+      const key = `${participant.identity}:${source}`;
+      const previous = trackStates.current.get(key);
+      trackStates.current.set(key, enabled);
+      if (source === Track.Source.Microphone) setIsMicEnabled(enabled);
+      if (source === Track.Source.Camera) setIsVideoEnabled(enabled);
+      if (source === Track.Source.ScreenShare) setIsScreenSharing(enabled);
+      if (previous === undefined || previous === enabled) return;
+
+      const version = (trackEventVersions.current.get(key) ?? 0) + 1;
+      trackEventVersions.current.set(key, version);
+      const on = enabled;
+      const name = local ? "You" : participantDisplayName(participant);
+      let type: RoomEventNotice["type"];
+      let sound: NonNullable<RoomEventNotice["sound"]>;
+      let soundCategory: NonNullable<RoomEventNotice["soundCategory"]>;
+      let vibrationCategory: NonNullable<RoomEventNotice["vibrationCategory"]>;
+      let description: string;
+
+      if (source === Track.Source.Microphone) {
+        type = on ? "microphone_on" : "microphone_off";
+        sound = local ? (on ? "microphoneOn" : "microphoneOff") : (on ? "remoteMicrophoneOn" : "remoteMicrophoneOff");
+        soundCategory = local ? "microphone" : "remoteMicrophone";
+        vibrationCategory = "microphone";
+        description = on ? "turned their microphone on" : "turned their microphone off";
+      } else if (source === Track.Source.Camera) {
+        type = on ? "camera_on" : "camera_off";
+        sound = on ? "cameraOn" : "cameraOff";
+        soundCategory = "camera";
+        vibrationCategory = "camera";
+        description = on ? "turned their camera on" : "turned their camera off";
+      } else {
+        type = on ? "screen_share_on" : "screen_share_off";
+        sound = on ? "screenShareOn" : "screenShareOff";
+        soundCategory = "screenShare";
+        vibrationCategory = "roomEvents";
+        description = on ? "started sharing their screen" : "stopped sharing their screen";
+      }
+
+      notifyRoomEvent({
+        id: `track:${key}:${on ? "on" : "off"}:${version}`,
+        type,
+        scope: local ? "local" : "room",
+        participantId: participant.identity,
+        senderName: name,
+        avatar: local ? session.avatar : participantAvatar(participant),
+        text: description,
+        sound,
+        soundCategory,
+        vibrationCategory,
+        vibrationPattern: source === Track.Source.ScreenShare ? 18 : 24,
+      });
+    };
     const handleConnected = () => {
       if (!active) return;
       logDiagnostic("connection successful");
@@ -322,6 +416,8 @@ export function RoomView({
       setConnectionStage("connected");
       setConnectingError(null);
       setIsReconnecting(false);
+      roomStateReady = true;
+      rememberRoomState();
       updateRemotes();
     };
     const handleDisconnected = (reason?: unknown) => {
@@ -347,6 +443,9 @@ export function RoomView({
       logDiagnostic("room reconnected");
       setIsReconnecting(false);
       setConnectionStage("connected");
+      // Reconcile presence without replaying join/leave notices after reconnect.
+      participantPresence.current = new Set(Array.from(lkRoom.remoteParticipants.keys()));
+      rememberRoomState();
       const pub = lkRoom.localParticipant.getTrackPublication(Track.Source.Microphone);
       if (pub?.track) {
         reapplyKrispIfNeeded(pub.track as LocalAudioTrack).catch((error) => {
@@ -358,23 +457,28 @@ export function RoomView({
       if (!active) return;
       const identity = participant?.identity;
       if (identity && identity !== session.participantId) {
-        const eventKey = `join:${identity}:${attemptId}`;
-        if (!notifiedParticipantEvents.current.has(eventKey)) {
-          notifiedParticipantEvents.current.add(eventKey);
-          soundManager.playJoin();
-          setRoomNotifications((previous) =>
-            capRoomNotifications([
-              ...previous,
-              {
-                id: `participant:${eventKey}`,
-                kind: "join" as const,
-                senderName: participant?.name || identity,
-                avatar: (() => { try { return JSON.parse(participant?.metadata || "{}").avatar || identity; } catch { return identity; } })(),
-                text: "joined the room",
-                expiresAt: getRoomNotificationExpiry(),
-              },
-            ]),
-          );
+        if (!participantPresence.current.has(identity)) {
+          participantPresence.current.add(identity);
+          rememberParticipant(participant!);
+          if (!roomStateReady) {
+            updateRemotes();
+            return;
+          }
+          const version = (participantEventVersions.current.get(identity) ?? 0) + 1;
+          participantEventVersions.current.set(identity, version);
+          notifyRoomEvent({
+            id: `participant:${identity}:join:${version}`,
+            type: "join",
+            scope: "room",
+            participantId: identity,
+            senderName: participantDisplayName(participant),
+            avatar: participantAvatar(participant),
+            text: "joined the room",
+            sound: "join",
+            soundCategory: "participants",
+            vibrationCategory: "participants",
+            vibrationPattern: 18,
+          });
         }
       }
       updateRemotes();
@@ -383,31 +487,30 @@ export function RoomView({
     const handleParticipantDisconnected = (participant?: Participant) => {
       if (!active) return;
       const identity = participant?.identity;
-      if (identity && identity !== session.participantId) {
-        const eventKey = `leave:${identity}:${attemptId}`;
-        if (!notifiedParticipantEvents.current.has(eventKey)) {
-          notifiedParticipantEvents.current.add(eventKey);
-          soundManager.playLeave();
-          setRoomNotifications((previous) =>
-            capRoomNotifications([
-              ...previous,
-              {
-                id: `participant:${eventKey}`,
-                kind: "leave" as const,
-                senderName: participant?.name || identity,
-                avatar: (() => { try { return JSON.parse(participant?.metadata || "{}").avatar || identity; } catch { return identity; } })(),
-                text: "left the room",
-                expiresAt: getRoomNotificationExpiry(),
-              },
-            ]),
-          );
-        }
+      if (identity && identity !== session.participantId && participantPresence.current.has(identity)) {
+        participantPresence.current.delete(identity);
+        const version = (participantEventVersions.current.get(identity) ?? 0) + 1;
+        participantEventVersions.current.set(identity, version);
+        notifyRoomEvent({
+          id: `participant:${identity}:leave:${version}`,
+          type: "leave",
+          scope: "room",
+          participantId: identity,
+          senderName: participantDisplayName(participant),
+          avatar: participantAvatar(participant),
+          text: "left the room",
+          sound: "leave",
+          soundCategory: "participants",
+          vibrationCategory: "participants",
+          vibrationPattern: 18,
+        });
       }
       updateRemotes();
       fetchRoomInfo();
     };
     const handleLocalTrackPublished = (pub: any) => {
       if (!active) return;
+      emitTrackState(pub, lkRoom.localParticipant, Boolean(pub.track && !pub.isMuted));
       setIsScreenSharing(lkRoom.localParticipant.isScreenShareEnabled);
       if (pub.source === Track.Source.Microphone) {
         setIsMicEnabled(true);
@@ -424,6 +527,7 @@ export function RoomView({
     };
     const handleLocalTrackUnpublished = (pub: any) => {
       if (!active) return;
+      emitTrackState(pub, lkRoom.localParticipant, false);
       setIsScreenSharing(lkRoom.localParticipant.isScreenShareEnabled);
       if (pub.source === Track.Source.Microphone) {
         setIsMicEnabled(false);
@@ -434,43 +538,30 @@ export function RoomView({
       }
       if (pub.source === Track.Source.ScreenShareAudio) setScreenAudioAvailable(false);
     };
-    const handleLocalTrackMuted = (pub: any, participant?: Participant) => {
+    const handleTrackMuted = (pub: any, participant?: Participant) => {
       if (!active) return;
-      if (participant && participant !== lkRoom.localParticipant) {
-        if (pub.source === Track.Source.Microphone) {
-          const eventKey = `${participant.identity}:muted`;
-          notifiedRemoteMicEvents.current.delete(`${participant.identity}:unmuted`);
-          if (!notifiedRemoteMicEvents.current.has(eventKey)) {
-            notifiedRemoteMicEvents.current.add(eventKey);
-            soundManager.playRemoteMicOff();
-          }
-        }
-        updateRemotes();
-        return;
-      }
-      if (pub.source === Track.Source.Microphone) setIsMicEnabled(false);
-      if (pub.source === Track.Source.Camera) {
-        setIsVideoEnabled(false);
-      }
+      emitTrackState(pub, participant, false);
+      if (participant && participant !== lkRoom.localParticipant) updateRemotes();
     };
-    const handleLocalTrackUnmuted = (pub: any, participant?: Participant) => {
+    const handleTrackUnmuted = (pub: any, participant?: Participant) => {
       if (!active) return;
-      if (participant && participant !== lkRoom.localParticipant) {
-        if (pub.source === Track.Source.Microphone) {
-          const eventKey = `${participant.identity}:unmuted`;
-          notifiedRemoteMicEvents.current.delete(`${participant.identity}:muted`);
-          if (!notifiedRemoteMicEvents.current.has(eventKey)) {
-            notifiedRemoteMicEvents.current.add(eventKey);
-            soundManager.playRemoteMicOn();
-          }
-        }
-        updateRemotes();
-        return;
-      }
-      if (pub.source === Track.Source.Microphone) setIsMicEnabled(true);
-      if (pub.source === Track.Source.Camera) {
-        setIsVideoEnabled(Boolean(pub.track) && !Boolean(pub.isMuted));
-      }
+      emitTrackState(pub, participant, Boolean(pub.track && !pub.isMuted));
+      if (participant && participant !== lkRoom.localParticipant) updateRemotes();
+    };
+    const handleRemoteTrackPublished = (publication: any, participant?: Participant) => {
+      if (!active || !participant) return;
+      emitTrackState(publication, participant, Boolean(publication.track && !publication.isMuted));
+      updateRemotes();
+    };
+    const handleRemoteTrackSubscribed = (_track: unknown, publication: any, participant?: Participant) => {
+      if (!active || !participant) return;
+      emitTrackState(publication, participant, Boolean(publication.track && !publication.isMuted));
+      updateRemotes();
+    };
+    const handleRemoteTrackUnpublished = (publication: any, participant?: Participant) => {
+      if (!active || !participant) return;
+      emitTrackState(publication, participant, false);
+      updateRemotes();
     };
     const handleParticipantPermissionsChanged = (_previousPermissions: unknown, participant?: Participant) => {
       if (!active || participant && participant !== lkRoom.localParticipant) return;
@@ -495,10 +586,13 @@ export function RoomView({
         { event: RoomEvent.Reconnected, handler: handleReconnected },
         { event: RoomEvent.ParticipantConnected, handler: handleParticipantConnected },
         { event: RoomEvent.ParticipantDisconnected, handler: handleParticipantDisconnected },
+        { event: RoomEvent.TrackPublished, handler: handleRemoteTrackPublished },
+        { event: RoomEvent.TrackSubscribed, handler: handleRemoteTrackSubscribed },
+        { event: RoomEvent.TrackUnpublished, handler: handleRemoteTrackUnpublished },
         { event: RoomEvent.LocalTrackPublished, handler: handleLocalTrackPublished },
         { event: RoomEvent.LocalTrackUnpublished, handler: handleLocalTrackUnpublished },
-        { event: RoomEvent.TrackMuted, handler: handleLocalTrackMuted },
-        { event: RoomEvent.TrackUnmuted, handler: handleLocalTrackUnmuted },
+        { event: RoomEvent.TrackMuted, handler: handleTrackMuted },
+        { event: RoomEvent.TrackUnmuted, handler: handleTrackUnmuted },
         { event: RoomEvent.ParticipantPermissionsChanged, handler: handleParticipantPermissionsChanged },
         { event: RoomEvent.ActiveSpeakersChanged, handler: handleActiveSpeakersChanged },
       ],
@@ -551,6 +645,7 @@ export function RoomView({
 
   const handleToggleMic = async () => {
     if (!room) return;
+    void soundManager.unlock();
     setMicError(null);
     const next = !isMicEnabled;
     if (next && !isMicAllowed) {
@@ -561,8 +656,6 @@ export function RoomView({
       await room.localParticipant.setMicrophoneEnabled(next, getMicCaptureOptions(isNoiseEnabled, selectedMicId || undefined));
       // Only update state AFTER the LiveKit call succeeds
       setIsMicEnabled(next);
-      soundManager.unlock();
-      next ? soundManager.playMicOn() : soundManager.playMicOff();
       if (next) {
         const pub = room.localParticipant.getTrackPublication(Track.Source.Microphone);
         if (pub?.track) {
@@ -581,6 +674,7 @@ export function RoomView({
           ? "Microphone is in use by another app."
           : "Could not access microphone. Please check your device.";
       setMicError(msg);
+      notifyRoomEvent({ id: `mic-error:${Date.now()}`, type: "error", scope: "local", participantId: session.participantId, senderName: "Microphone", avatar: session.avatar, text: msg, sound: "error", soundCategory: "roomActions", vibrationCategory: "roomEvents", vibrationPattern: [24, 30, 24], durationMs: 5000 });
       // Do NOT change isMicEnabled — revert to actual state
     }
   };
@@ -626,6 +720,7 @@ export function RoomView({
   };
   const handleToggleVideo = async () => {
     if (!room) return;
+    void soundManager.unlock();
     setCameraError(null);
     const currentCamera = room.localParticipant.getTrackPublication(Track.Source.Camera);
     const next = !(Boolean(currentCamera?.track) && !Boolean(currentCamera?.isMuted));
@@ -645,6 +740,7 @@ export function RoomView({
           ? "Camera is in use by another app."
           : "Could not access camera. Please check your device.";
       setCameraError(msg);
+      notifyRoomEvent({ id: `camera-error:${Date.now()}`, type: "error", scope: "local", participantId: session.participantId, senderName: "Camera", avatar: session.avatar, text: msg, sound: "error", soundCategory: "roomActions", vibrationCategory: "roomEvents", vibrationPattern: [24, 30, 24], durationMs: 5000 });
       // Do NOT change isVideoEnabled — revert to actual state
     }
   };
@@ -689,6 +785,7 @@ export function RoomView({
 
   const handleToggleScreenShare = async () => {
     if (!room) return;
+    void soundManager.unlock();
     const next = !isScreenSharing;
     if (next && !isScreenShareAllowed) {
       setHostActionError("The host has disabled screen sharing for you.");
@@ -721,6 +818,21 @@ export function RoomView({
     window.setTimeout(() => setFullscreenFallbackNotice(false), 6000);
   };
 
+  const handleInviteCopied = (kind: "link" | "code") => {
+    notifyRoomEvent({
+      id: `invite-copied:${kind}:${Date.now()}`,
+      type: "invite_copied",
+      scope: "local",
+      participantId: session.participantId,
+      senderName: "You",
+      avatar: session.avatar,
+      text: `copied the invite ${kind}`,
+      sound: "success",
+      soundCategory: "roomActions",
+      durationMs: 3000,
+    });
+  };
+
   const handleToggleHandRaise = () => {
     const next = !isHandRaised;
     setIsHandRaised(next);
@@ -730,6 +842,7 @@ export function RoomView({
   // ---- Host action handlers ----
 
   const handleUpdateLock = async (locked: boolean) => {
+    void soundManager.unlock();
     const res = await fetch(`/api/rooms/${roomCode}/lock`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -741,11 +854,14 @@ export function RoomView({
     });
     if (res.ok) {
       setIsLocked(locked);
-      sendHostBroadcast("lock_state", undefined);
+      const eventId = `lock-${Date.now()}`;
+      notifyRoomEvent({ id: `host-lock:${eventId}`, type: locked ? "room_lock" : "room_unlock", scope: "local", participantId: session.participantId, senderName: "You", avatar: session.avatar, text: locked ? "locked the room" : "unlocked the room", sound: "roomAction", soundCategory: "roomActions", vibrationCategory: "roomEvents" });
+      sendHostBroadcast("lock_state", undefined, { locked, eventId });
     }
   };
 
   const handleUpdateTitle = async (newTitle: string) => {
+    void soundManager.unlock();
     const res = await fetch(`/api/rooms/${roomCode}/title`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -757,10 +873,14 @@ export function RoomView({
     });
     if (res.ok) {
       setRoomTitle(newTitle);
+      const eventId = `title-${Date.now()}`;
+      notifyRoomEvent({ id: `room-title:${eventId}`, type: "room_setting", scope: "local", participantId: session.participantId, senderName: "You", avatar: session.avatar, text: "updated the room title", sound: "roomAction", soundCategory: "roomActions" });
+      sendHostBroadcast("room_setting", undefined, { eventId, setting: "title" });
     }
   };
 
   const handleKickParticipant = async (targetId: string) => {
+    void soundManager.unlock();
     const res = await fetch(`/api/rooms/${roomCode}/moderate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -772,7 +892,10 @@ export function RoomView({
       }),
     });
     if (res.ok) {
-      sendHostBroadcast("kick", targetId);
+      const target = publicParticipants.find((participant) => participant.id === targetId);
+      const eventId = `kick-${targetId}-${Date.now()}`;
+      notifyRoomEvent({ id: `host-kick:${eventId}`, type: "host_remove", scope: "local", participantId: targetId, senderName: "You", avatar: target?.avatar || DEFAULT_AVATAR_ID, text: `removed ${target?.displayName || "a participant"} from the room`, sound: "roomAction", soundCategory: "roomActions", vibrationCategory: "roomEvents" });
+      sendHostBroadcast("kick", targetId, { eventId, targetName: target?.displayName });
       fetchRoomInfo();
     } else {
       setHostActionError("The kick did not complete. Refresh the participant list and try again.");
@@ -780,6 +903,7 @@ export function RoomView({
   };
 
   const handleMuteParticipant = async (targetId: string, muted: boolean) => {
+    void soundManager.unlock();
     const res = await fetch(`/api/rooms/${roomCode}/moderate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -791,10 +915,14 @@ export function RoomView({
     }
     setHostActionError(null);
     await fetchRoomInfo();
-    sendHostBroadcast("mute", targetId);
+    const target = publicParticipants.find((participant) => participant.id === targetId);
+    const eventId = `mute-${targetId}-${Date.now()}`;
+    notifyRoomEvent({ id: `host-mute:${eventId}`, type: muted ? "host_mute" : "host_unmute", scope: "local", participantId: targetId, senderName: "You", avatar: target?.avatar || DEFAULT_AVATAR_ID, text: `${muted ? "muted" : "unmuted"} ${target?.displayName || "a participant"}`, sound: "roomAction", soundCategory: "roomActions", vibrationCategory: "roomEvents" });
+    sendHostBroadcast("mute", targetId, { muted, eventId, targetName: target?.displayName });
   };
 
   const handleSetScreenSharePermission = async (targetId: string, allowed: boolean) => {
+    void soundManager.unlock();
     const res = await fetch(`/api/rooms/${roomCode}/moderate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -806,9 +934,14 @@ export function RoomView({
     }
     setHostActionError(null);
     await fetchRoomInfo();
+    const target = publicParticipants.find((participant) => participant.id === targetId);
+    const eventId = `screen-permission-${targetId}-${Date.now()}`;
+    notifyRoomEvent({ id: `room-setting:${eventId}`, type: "room_setting", scope: "local", participantId: targetId, senderName: "You", avatar: target?.avatar || DEFAULT_AVATAR_ID, text: `${allowed ? "allowed" : "disabled"} screen sharing for ${target?.displayName || "a participant"}`, sound: "roomAction", soundCategory: "roomActions" });
+    sendHostBroadcast("room_setting", undefined, { eventId, setting: "screen_share_permission" });
   };
 
   const handleTransferHost = async (targetId: string) => {
+    void soundManager.unlock();
     const res = await fetch(`/api/rooms/${roomCode}/moderate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -821,14 +954,17 @@ export function RoomView({
     });
     if (res.ok) {
       setSession((prev) => ({ ...prev, role: "member" }));
-      sendHostBroadcast("host_transferred", targetId);
+      const eventId = `transfer-${targetId}-${Date.now()}`;
+      notifyRoomEvent({ id: `host-transfer:${eventId}`, type: "host_transfer", scope: "local", participantId: targetId, senderName: "You", avatar: session.avatar, text: "transferred host privileges", sound: "roomAction", soundCategory: "roomActions" });
+      sendHostBroadcast("host_transferred", targetId, { eventId });
       fetchRoomInfo();
     }
   };
 
   const handleEndRoom = async () => {
     cleanupKrisp().catch(() => {});
-    await fetch(`/api/rooms/${roomCode}/end`, {
+    void soundManager.unlock();
+    const res = await fetch(`/api/rooms/${roomCode}/end`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -836,12 +972,19 @@ export function RoomView({
         sessionSecret: session.sessionSecret,
       }),
     });
-    sendHostBroadcast("room_ended");
+    if (!res.ok) {
+      setHostActionError("Could not end the room. Please try again.");
+      return;
+    }
+    const eventId = `ended-${Date.now()}`;
+    notifyRoomEvent({ id: `room-ended:${eventId}`, type: "room_setting", scope: "local", participantId: session.participantId, senderName: "You", avatar: session.avatar, text: "ended the room", sound: "roomAction", soundCategory: "roomActions", vibrationCategory: "roomEvents" });
+    sendHostBroadcast("room_ended", undefined, { eventId });
     clearRoomSession(roomCode);
     router.push("/");
   };
 
   const handleSetPassword = async (password: string | null) => {
+    void soundManager.unlock();
     const res = await fetch(`/api/rooms/${roomCode}/password`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -854,6 +997,9 @@ export function RoomView({
     if (res.ok) {
       const data = await res.json();
       setHasRoomPassword(!!data.hasPassword);
+      const eventId = `password-${Date.now()}`;
+      notifyRoomEvent({ id: `room-password:${eventId}`, type: "room_setting", scope: "local", participantId: session.participantId, senderName: "You", avatar: session.avatar, text: data.hasPassword ? "set a room password" : "removed the room password", sound: "roomAction", soundCategory: "roomActions" });
+      sendHostBroadcast("room_setting", undefined, { eventId, setting: "password" });
     }
   };
 
@@ -1294,6 +1440,7 @@ export function RoomView({
         onClose={() => setIsInviteOpen(false)}
         roomCode={roomCode}
         roomTitle={roomTitle}
+        onCopied={handleInviteCopied}
       />
 
       {/* Host Controls Dialog */}

@@ -4,13 +4,14 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Room } from "livekit-client";
 import { MediaQueueItem } from "@/types";
 import { projectedPlaybackTime } from "@/lib/media-sync";
+import type { RoomEventNotice } from "@/lib/room-notifications";
 
-interface UseMediaQueueOptions { room: Room | null; isHost: boolean; localParticipantId: string; hostParticipantId?: string; roomCode: string; sessionSecret: string; }
+interface UseMediaQueueOptions { room: Room | null; isHost: boolean; localParticipantId: string; hostParticipantId?: string; roomCode: string; sessionSecret: string; onRoomEvent?: (event: RoomEventNotice) => void; }
 interface QueueApiItem { id: string; sourceType: "youtube" | "direct"; sourceUrl: string; title: string; ownerParticipantId: string; addedBy?: string; addedByName?: string; avatar?: string; position: number; }
 interface QueueSnapshot { items: QueueApiItem[]; playback: { currentItemId: string | null; playbackState: "playing" | "paused"; positionSeconds: number; playbackStartedAt: string | null; playbackRate: number; version: number } | null; serverTime?: number; }
 interface UseMediaQueueReturn { queue: MediaQueueItem[]; currentIndex: number; isPlaying: boolean; currentTime: number; currentItem: MediaQueueItem | null; canControlCurrentItem: boolean; addItem: (item: Omit<MediaQueueItem, "id">) => void; removeItem: (itemId: string) => void; play: () => void; pause: () => void; seek: (time: number) => void; nextItem: () => void; setCurrentTime: (t: number) => void; playItem: (index: number) => void; }
 
-export function useMediaQueue({ isHost, localParticipantId, roomCode, sessionSecret }: UseMediaQueueOptions): UseMediaQueueReturn {
+export function useMediaQueue({ isHost, localParticipantId, roomCode, sessionSecret, onRoomEvent }: UseMediaQueueOptions): UseMediaQueueReturn {
   const [queue, setQueue] = useState<MediaQueueItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -18,11 +19,91 @@ export function useMediaQueue({ isHost, localParticipantId, roomCode, sessionSec
   const versionRef = useRef(0);
   const stateRef = useRef({ queue, currentIndex, isPlaying, currentTime });
   stateRef.current = { queue, currentIndex, isPlaying, currentTime };
+  const onRoomEventRef = useRef(onRoomEvent);
+  onRoomEventRef.current = onRoomEvent;
+  const lastSnapshotRef = useRef<QueueSnapshot | null>(null);
+  const refreshRequestRef = useRef(0);
+  const localRemovalIdsRef = useRef(new Set<string>());
   const endpoint = `/api/rooms/${encodeURIComponent(roomCode)}/media-queue`;
   const auth = { participantId: localParticipantId, sessionSecret };
 
   const applySnapshot = useCallback((snapshot: QueueSnapshot) => {
-    const nextQueue: MediaQueueItem[] = snapshot.items.map((item) => ({ id: item.id, type: item.sourceType === "youtube" ? "youtube" : "url", title: item.title, src: item.sourceUrl, addedBy: item.ownerParticipantId, addedByName: item.addedByName || item.ownerParticipantId }));
+    const previousSnapshot = lastSnapshotRef.current;
+    if (previousSnapshot) {
+      const previousItems = new Map(previousSnapshot.items.map((item) => [item.id, item]));
+      const nextIds = new Set(snapshot.items.map((item) => item.id));
+      for (const item of snapshot.items) {
+        if (previousItems.has(item.id)) continue;
+        const local = item.ownerParticipantId === localParticipantId;
+        onRoomEventRef.current?.({
+          id: `media-queue:add:${item.id}`,
+          type: "queue_add",
+          scope: local ? "local" : "room",
+          participantId: item.ownerParticipantId,
+          senderName: local ? "You" : item.addedByName || "A participant",
+          avatar: typeof item.avatar === "string" && item.avatar.startsWith("/avatars/") ? item.avatar : "persona-male-pfp",
+          text: `added ${item.title} to the queue`,
+          sound: "queueChange",
+          soundCategory: "mediaQueue",
+          vibrationCategory: "roomEvents",
+          vibrationPattern: 18,
+        });
+      }
+      for (const removed of previousSnapshot.items) {
+        if (nextIds.has(removed.id)) continue;
+        const local = localRemovalIdsRef.current.delete(removed.id);
+        onRoomEventRef.current?.({
+          id: `media-queue:remove:${removed.id}`,
+          type: "queue_remove",
+          scope: local ? "local" : "room",
+          participantId: local ? localParticipantId : undefined,
+          senderName: local ? "You" : "Media queue",
+          avatar: local ? "persona-male-pfp" : "persona-male-pfp",
+          text: local ? `removed ${removed.title} from the queue` : `${removed.title} was removed from the queue`,
+          sound: "queueChange",
+          soundCategory: "mediaQueue",
+          vibrationCategory: "roomEvents",
+          vibrationPattern: 16,
+        });
+      }
+
+      const oldPlayback = previousSnapshot.playback;
+      const nextPlayback = snapshot.playback;
+      const oldItemId = oldPlayback?.currentItemId ?? null;
+      const nextItemId = nextPlayback?.currentItemId ?? null;
+      const oldState = oldPlayback?.playbackState;
+      const nextState = nextPlayback?.playbackState;
+      const current = snapshot.items.find((item) => item.id === nextItemId);
+      let playbackType: RoomEventNotice["type"] | null = null;
+      let playbackText = "";
+      if (oldItemId && !nextItemId) {
+        playbackType = "playback_end";
+        playbackText = "finished shared playback";
+      } else if (nextItemId && (nextItemId !== oldItemId || oldState !== "playing" && nextState === "playing")) {
+        playbackType = "playback_start";
+        playbackText = current ? `started playing ${current.title}` : "started shared playback";
+      } else if (nextItemId && oldState === "playing" && nextState === "paused") {
+        playbackType = "playback_pause";
+        playbackText = current ? `paused ${current.title}` : "paused shared playback";
+      }
+      if (playbackType) {
+        const version = nextPlayback?.version ?? oldPlayback?.version ?? 0;
+        onRoomEventRef.current?.({
+          id: `media-playback:${version}:${oldItemId || "none"}:${nextItemId || "none"}:${playbackType}`,
+          type: playbackType,
+          scope: "room",
+          senderName: "Shared playback",
+          avatar: "persona-male-pfp",
+          text: playbackText,
+          sound: "playback",
+          soundCategory: "mediaQueue",
+          vibrationCategory: "roomEvents",
+          vibrationPattern: 16,
+        });
+      }
+    }
+    lastSnapshotRef.current = snapshot;
+    const nextQueue: MediaQueueItem[] = snapshot.items.map((item) => ({ id: item.id, type: item.sourceType === "youtube" ? "youtube" : "url", title: item.title, src: item.sourceUrl, addedBy: item.ownerParticipantId, addedByName: item.addedByName || "A participant" }));
     setQueue(nextQueue);
     const playback = snapshot.playback;
     if (!playback) { setCurrentIndex(0); setIsPlaying(false); setCurrentTime(0); return; }
@@ -34,9 +115,11 @@ export function useMediaQueue({ isHost, localParticipantId, roomCode, sessionSec
   }, []);
 
   const refresh = useCallback(async () => {
+    const requestId = ++refreshRequestRef.current;
     try {
       const response = await fetch(endpoint, { cache: "no-store", headers: { "x-addaroom-participant-id": localParticipantId, "x-addaroom-session-secret": sessionSecret } });
       if (!response.ok) return;
+      if (requestId !== refreshRequestRef.current) return;
       applySnapshot(await response.json() as QueueSnapshot);
     } catch (error) { console.warn("[useMediaQueue] authoritative refresh failed", error); }
   }, [applySnapshot, endpoint, localParticipantId, sessionSecret]);
@@ -63,7 +146,10 @@ export function useMediaQueue({ isHost, localParticipantId, roomCode, sessionSec
   const removeItem = useCallback(async (itemId: string) => {
     const item = stateRef.current.queue.find((candidate) => candidate.id === itemId);
     if (!item || (item.addedBy !== localParticipantId && !isHost)) return;
-    try { await fetch(`${endpoint}/${encodeURIComponent(itemId)}`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify(auth) }); } finally { await refresh(); }
+    try {
+      const response = await fetch(`${endpoint}/${encodeURIComponent(itemId)}`, { method: "DELETE", headers: { "content-type": "application/json" }, body: JSON.stringify(auth) });
+      if (response.ok) localRemovalIdsRef.current.add(itemId);
+    } finally { await refresh(); }
   }, [endpoint, isHost, localParticipantId, refresh, sessionSecret]);
 
   const play = useCallback(() => { const item = stateRef.current.queue[stateRef.current.currentIndex]; if (!item || (item.addedBy !== localParticipantId && !isHost)) return; setIsPlaying(true); void writePlayback("play", stateRef.current.currentTime); }, [isHost, localParticipantId, writePlayback]);

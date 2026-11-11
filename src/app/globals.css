@@ -170,3 +170,4 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   .room-notification { right: 12px; width: calc(100vw - 24px); }.room-shell footer { padding-left: 8px; padding-right: 8px; }
 }
 @media (prefers-reduced-motion: reduce) { *,*::before,*::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }.reveal,.hero-copy.reveal>* { opacity: 1 !important; transform: none !important; transition: none !important; }.demo-window,.demo-screen,.demo-chat-pop,.demo-reaction,.demo-person { animation: none !important; opacity: 1 !important; transform: none !important; } }
+@media (prefers-reduced-motion: reduce) { .room-notification { animation: none !important; transition: none !important; } }
