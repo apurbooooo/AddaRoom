@@ -175,7 +175,7 @@ export function JoinRoomCard({ room }: JoinRoomCardProps) {
           <button
             type="submit"
             disabled={loading || !displayName.trim()}
-            className="w-full py-3 rounded-xl bg-brand hover:bg-[#ceff44] text-black font-bold text-sm shadow-lg shadow-brand/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full py-3 rounded-xl bg-brand hover:bg-cyan-300 text-black font-bold text-sm shadow-lg shadow-brand/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
             {loading ? "Joining Adda..." : "Join Hangout"}

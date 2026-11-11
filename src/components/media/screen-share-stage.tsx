@@ -219,7 +219,7 @@ export function ScreenShareStage({
                         <Monitor className="w-4 h-4 text-brand" />
                         <span>{participant.name || participant.identity}&apos;s Screen</span>
                         {isLocal && (
-                            <span className="text-[10px] bg-indigo-500/30 text-indigo-300 px-1.5 py-0.5 rounded">
+                            <span className="text-[10px] bg-violet-500/20 text-violet-200 px-1.5 py-0.5 rounded">
                                 Sharing
                             </span>
                         )}
@@ -251,7 +251,7 @@ export function ScreenShareStage({
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-slate-950/80 hover:bg-slate-900 border border-white/10 backdrop-blur-md text-xs font-medium text-slate-200 transition-colors shadow-lg"
                         title="Configure Live Screen Chat Overlay"
                     >
-                        <Sliders className="w-3.5 h-3.5 text-indigo-400" />
+                        <Sliders className="w-3.5 h-3.5 text-violet-300" />
                         <span className="hidden md:inline">Chat Overlay</span>
                     </button>
 

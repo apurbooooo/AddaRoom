@@ -170,7 +170,7 @@ export function CreateRoomModal({ isOpen, onClose }: CreateRoomModalProps) {
           <button
             type="submit"
             disabled={loading}
-            className="w-full mt-2 py-3 rounded-xl bg-brand hover:bg-[#ceff44] text-black font-bold text-sm shadow-lg shadow-brand/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full mt-2 py-3 rounded-xl bg-brand hover:bg-cyan-300 text-black font-bold text-sm shadow-lg shadow-brand/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
             {loading ? "Creating Adda..." : "Enter Your Room"}

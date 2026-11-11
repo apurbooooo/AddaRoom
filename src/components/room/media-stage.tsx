@@ -47,7 +47,7 @@ export function MediaStage({
         {canAddMedia && (
           <button
             onClick={onOpenAddMedia}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand hover:bg-[#ceff44] text-black font-bold text-sm shadow-lg shadow-brand/25 transition-all min-h-[44px]"
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-brand hover:bg-cyan-300 text-black font-bold text-sm shadow-lg shadow-brand/25 transition-all min-h-[44px]"
           >
             <Plus className="w-4 h-4" />
             Add to Queue

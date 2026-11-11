@@ -30,7 +30,7 @@ export function ScreenChatOverlaySettings({
         </button>
 
         <div className="flex items-center gap-2 mb-4">
-          <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+          <div className="p-2 rounded-xl bg-violet-500/10 text-violet-400 border border-violet-500/20">
             <Sliders className="w-4 h-4" />
           </div>
           <div>
@@ -49,7 +49,7 @@ export function ScreenChatOverlaySettings({
               onChange={(e) => onChange({ enabled: e.target.checked })}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+            <div className="w-11 h-6 bg-slate-800 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-violet-600"></div>
           </label>
         </div>
 
@@ -73,7 +73,7 @@ export function ScreenChatOverlaySettings({
                 onClick={() => onChange({ position: pos })}
                 className={`py-2 px-3 rounded-xl border text-center font-medium transition-colors ${
                   config.position === pos
-                    ? "bg-indigo-600/30 border-indigo-500 text-indigo-200"
+                    ? "bg-violet-600/30 border-violet-500 text-violet-200"
                     : "bg-slate-950 border-slate-800 text-slate-400 hover:border-slate-700"
                 }`}
               >
@@ -87,7 +87,7 @@ export function ScreenChatOverlaySettings({
         <div className="mb-4">
           <div className="flex justify-between text-xs font-semibold text-slate-400 mb-1.5">
             <span>Bubble Opacity</span>
-            <span className="text-indigo-400">{Math.round(config.opacity * 100)}%</span>
+            <span className="text-violet-400">{Math.round(config.opacity * 100)}%</span>
           </div>
           <input
             type="range"
@@ -96,7 +96,7 @@ export function ScreenChatOverlaySettings({
             step="0.05"
             value={config.opacity}
             onChange={(e) => onChange({ opacity: parseFloat(e.target.value) })}
-            className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+            className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-violet-500"
           />
         </div>
 
@@ -104,7 +104,7 @@ export function ScreenChatOverlaySettings({
         <div className="mb-4">
           <div className="flex justify-between text-xs font-semibold text-slate-400 mb-1.5">
             <span>Fade-out Duration</span>
-            <span className="text-indigo-400">{config.fadeOutSeconds}s</span>
+            <span className="text-violet-400">{config.fadeOutSeconds}s</span>
           </div>
           <input
             type="range"
@@ -113,7 +113,7 @@ export function ScreenChatOverlaySettings({
             step="1"
             value={config.fadeOutSeconds}
             onChange={(e) => onChange({ fadeOutSeconds: parseInt(e.target.value, 10) })}
-            className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"
+            className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-violet-500"
           />
         </div>
 
@@ -124,13 +124,13 @@ export function ScreenChatOverlaySettings({
             type="checkbox"
             checked={config.hideOwnMessages}
             onChange={(e) => onChange({ hideOwnMessages: e.target.checked })}
-            className="w-4 h-4 rounded bg-slate-950 border-slate-700 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+            className="w-4 h-4 rounded bg-slate-950 border-slate-700 text-violet-600 focus:ring-violet-500 cursor-pointer"
           />
         </div>
 
         <button
           onClick={onClose}
-          className="mt-5 w-full py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs transition-colors"
+          className="mt-5 w-full py-2 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-xs transition-colors"
         >
           Done
         </button>

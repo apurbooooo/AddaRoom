@@ -20,7 +20,7 @@ function typeIcon(type: MediaQueueItem["type"]) {
     case "youtube":
       return <Youtube className="w-3.5 h-3.5 text-rose-400 flex-shrink-0" />;
     case "url":
-      return <Link className="w-3.5 h-3.5 text-blue-400 flex-shrink-0" />;
+      return <Link className="w-3.5 h-3.5 text-violet-300 flex-shrink-0" />;
     case "file":
       return <Film className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />;
   }

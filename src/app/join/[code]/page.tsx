@@ -74,7 +74,7 @@ export default function JoinRoomPage({
             <p className="text-xs text-gray-400 mb-6">{error}</p>
             <button
               onClick={() => router.push("/")}
-              className="px-5 py-2.5 rounded-xl bg-brand hover:bg-[#ceff44] text-black font-semibold text-xs"
+              className="px-5 py-2.5 rounded-xl bg-brand hover:bg-cyan-300 text-black font-semibold text-xs"
             >
               Return Home
             </button>

@@ -152,7 +152,7 @@ export function HostControlsDialog({
         </button>
 
         <div className="flex items-center gap-2 mb-4">
-          <div className="p-2.5 rounded-xl bg-amber-500/10 text-amber-400 border border-amber-500/20">
+          <div className="p-2.5 rounded-xl bg-violet-500/10 text-violet-300 border border-violet-400/20">
             <Crown className="w-5 h-5" />
           </div>
           <div>
@@ -178,7 +178,7 @@ export function HostControlsDialog({
               <button
                 onClick={handleSaveTitle}
                 disabled={loadingAction === "title"}
-                className="p-2 rounded-lg bg-brand hover:bg-[#ceff44] text-black"
+                className="p-2 rounded-lg bg-brand hover:bg-cyan-300 text-black"
               >
                 <Check className="w-4 h-4" />
               </button>
@@ -188,7 +188,7 @@ export function HostControlsDialog({
               <span className="text-sm font-bold text-white">{roomTitle}</span>
               <button
                 onClick={() => setEditingTitle(true)}
-                className="flex items-center gap-1 text-xs text-brand hover:text-[#ceff44]"
+                className="flex items-center gap-1 text-xs text-brand hover:text-cyan-300"
               >
                 <Edit3 className="w-3.5 h-3.5" /> Edit
               </button>
@@ -241,7 +241,7 @@ export function HostControlsDialog({
             <button
               onClick={handleSetPassword}
               disabled={!newPassword.trim() || loadingAction === "setPassword"}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-brand hover:bg-[#ceff44] text-black text-xs font-bold disabled:opacity-50 transition-colors min-h-[44px]"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-brand hover:bg-cyan-300 text-black text-xs font-bold disabled:opacity-50 transition-colors min-h-[44px]"
             >
               {loadingAction === "setPassword" ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -268,7 +268,7 @@ export function HostControlsDialog({
           <p className="text-[11px]">
             Status:{" "}
             {hasPassword ? (
-              <span className="text-[#BBFB2B] font-semibold">Password protected</span>
+              <span className="text-brand font-semibold">Password protected</span>
             ) : (
               <span className="text-gray-500">No password</span>
             )}

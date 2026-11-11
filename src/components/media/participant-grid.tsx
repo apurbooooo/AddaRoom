@@ -97,7 +97,7 @@ export function ParticipantGrid({
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto bg-[radial-gradient(circle_at_top,rgba(187,251,43,0.045),transparent_38%),#070707] p-2 sm:p-4 lg:p-6">
+    <div className="participant-grid-canvas flex-1 min-h-0 overflow-y-auto p-2 sm:p-4 lg:p-6">
       <div className={`grid gap-3 sm:gap-4 h-full min-h-full max-w-[1440px] mx-auto ${gridClasses} auto-rows-fr`}>
           {allParticipants.map((p) => (
           <div key={p.identity} className="w-full h-full min-h-[190px] sm:min-h-[240px] lg:min-h-[280px] rounded-3xl bg-[#0d0d0d] p-1 shadow-xl shadow-black/30">
